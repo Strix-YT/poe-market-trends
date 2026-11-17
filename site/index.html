@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PoE Covens Market Trends &amp; 7-Day Forecast</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+:root{--color-fg:#1f1e1c;--color-fg-muted:#6b6862;--color-bg:#faf9f6;--color-panel:#ffffff;--color-border-line:#e4e1da;--color-ok:#2e7d4f;--color-warn:#b7791f;--color-bad:#c0392b;
+--font-anthropic-sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--font-anthropic-serif:Georgia,"Times New Roman",serif;
+--cds-font-size-caption:12.5px;--cds-font-size-body:15px;--cds-font-size-heading:17px;--cds-font-size-title:28px;--cds-font-weight-medium:600;
+--cds-gap-xs:4px;--cds-gap-sm:8px;--cds-gap-md:12px;--cds-gap-lg:18px;--cds-gap-xl:28px;--cds-pad-xs:4px;--cds-pad-sm:8px;--cds-pad-md:12px;--cds-pad-lg:16px;--cds-radius:8px;
+--cds-chart-grid:#ece9e3;--cds-chart-axis:#cfcbc2;--cds-chart-reference:#a29d93;--cds-text-secondary:#6b6862;--cds-surface-popover:#ffffff;--cds-border:#dedad2;--cds-shadow-popover:0 4px 14px rgba(0,0,0,.12);--series-0:#3b6fd8}
+@media (prefers-color-scheme: dark){:root{--color-fg:#ecebe7;--color-fg-muted:#a5a29b;--color-bg:#1c1b19;--color-panel:#252421;--color-border-line:#3a3834;--color-ok:#5cc28a;--color-bad:#ef6b5b;
+--cds-chart-grid:#2f2d2a;--cds-chart-axis:#4a4742;--cds-chart-reference:#7d7870;--cds-text-secondary:#a5a29b;--cds-surface-popover:#2b2a27;--cds-border:#45423d;--series-0:#7aa2f7}}
+body{margin:0;background:var(--color-bg);color:var(--color-fg)}
+.pc-wrap{max-width:1200px;margin:0 auto;padding:24px 20px 48px}
+.dash-select{font:inherit;font-size:var(--cds-font-size-caption);padding:6px 28px 6px 10px;border:1px solid var(--color-border-line);border-radius:var(--cds-radius);background-color:var(--color-panel);color:var(--color-fg)}
+.pc-btn{font:inherit;font-size:var(--cds-font-size-caption);padding:4px 12px;border:1px solid var(--color-border-line);border-radius:999px;background-color:var(--color-panel);color:var(--color-fg);cursor:pointer;margin-left:6px}.pc-btn:disabled{opacity:.6;cursor:default}
+.pc-stamp{font-size:var(--cds-font-size-caption);color:var(--color-fg-muted)}
+</style>
+<script>
+/* Small runtime: loads the data files and redraws */
+window.dash = (function(){
+  const src = {items:'data/items.json', history:'data/history.json', divine:'data/divine.json'};
+  const store = {}, calcs = {}, draws = {}, meta = {};
+  Object.keys(src).forEach(k => store[k] = {status:'loading', data:[]});
+  const api = {
+    colors: ['var(--series-0)'],
+    data(id){ if (calcs[id]) return calcs[id].val; return store[id] || {status:'missing', data:[]}; },
+    calc(id, def){ calcs[id] = {def, val:{status:'loading', data:null}}; },
+    draw(name, fn){
+      if (fn) { draws[name] = fn; return; }
+      if (!draws[name]) return;
+      document.querySelectorAll('[data-draw="'+name+'"]').forEach(el => { try { draws[name](el); } catch(e){ console.error(name, e); } });
+    },
+    meta,
+    redrawAll(){ Object.keys(draws).forEach(n => api.draw(n)); }
+  };
+  function runCalcs(){
+    Object.values(calcs).forEach(c => {
+      const ins = c.def.inputs.map(i => store[i]);
+      if (ins.some(s => s.status !== 'ok')) { c.val = {status: ins.some(s=>s.status==='error') ? 'error':'loading', data:null}; return; }
+      try { c.val = {status:'ok', data: c.def.fn(...ins.map(s => s.data))}; } catch(e){ c.val = {status:'error', data:null}; }
+    });
+  }
+  async function load(){
+    await Promise.all(Object.entries(src).map(async ([k,u]) => {
+      try { const j = await fetch(u + '?t=' + Date.now(), {cache:'no-store'}).then(r => { if(!r.ok) throw r.status; return r.json(); });
+        store[k] = {status:'ok', data: Array.isArray(j) ? j : j.rows}; if (j.generatedAt) meta.generatedAt = j.generatedAt; }
+      catch(e){ if (!store[k] || store[k].status !== 'ok') store[k] = {status:'error', data:[]}; }
+    }));
+    runCalcs(); api.redrawAll();
+  }
+  api.reload = load;
+  api.boot = async function(){
+    api.redrawAll();
+    await load();
+    let w = window.innerWidth; window.addEventListener('resize', () => { if (Math.abs(window.innerWidth - w) > 20) { w = window.innerWidth; api.redrawAll(); } });
+  };
+  return api;
+})();
+</script>
+</head><body><div class="pc-wrap">
+<style>
+.pc { display: flex; flex-direction: column; gap: var(--cds-gap-xl); font-family: var(--font-anthropic-sans); color: var(--color-fg); }
+.pc-title { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); margin: 0; }
+.pc-sub { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); margin: var(--cds-gap-xs) 0 0; }
+.pc-take { font-size: var(--cds-font-size-body); line-height: 1.55; margin: var(--cds-gap-md) 0 0; max-width: 62rem; }
+.pc-take b { font-variant-numeric: tabular-nums; }
+.pc-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--cds-gap-md); }
+.pc-card { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); position: relative; }
+.pc-k { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.pc-v { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: 2rem; line-height: 1.15; margin-top: var(--cds-gap-xs); font-variant-numeric: tabular-nums; }
+.pc-d { font-size: var(--cds-font-size-caption); margin-top: var(--cds-gap-xs); font-variant-numeric: tabular-nums; color: var(--color-fg-muted); }
+.pc-good { color: var(--color-ok); } .pc-bad { color: var(--color-bad); }
+.pc-h2 { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); margin: 0 0 var(--cds-gap-xs); }
+.pc-cap { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); margin: 0 0 var(--cds-gap-md); }
+.pc-row { display: flex; flex-wrap: wrap; gap: var(--cds-gap-sm); align-items: center; margin-bottom: var(--cds-gap-md); }
+.pc-row label { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.pc-search { font: inherit; font-size: var(--cds-font-size-caption); padding: 6px 10px; border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); background-color: var(--color-bg); color: var(--color-fg); min-width: 180px; }
+.pc-filterbar { position: sticky; top: 0; z-index: 6; background-color: var(--color-bg); padding: var(--cds-pad-sm) 0; border-bottom: 1px solid var(--color-border-line); }
+.pc-chart { position: relative; min-height: 260px; }
+.pc-chart.pc-tall { min-height: 520px; }
+.pc-chart svg { display: block; overflow: visible; }
+.pc-chart .tick text, .pc-chart .pc-lab { fill: var(--cds-text-secondary); font-size: var(--cds-font-size-caption); font-family: var(--font-anthropic-sans); }
+.pc-chart .tick line, .pc-chart .domain { stroke: var(--cds-chart-axis); }
+.pc-chart .pc-grid line { stroke: var(--cds-chart-grid); }
+.pc-chart .pc-grid .domain { display: none; }
+.pc-tip { position: absolute; pointer-events: none; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); box-shadow: var(--cds-shadow-popover); border-radius: var(--cds-radius); padding: var(--cds-pad-xs) var(--cds-pad-sm); font-size: var(--cds-font-size-caption); white-space: nowrap; z-index: 5; }
+.pc-tip .pc-tk { color: var(--cds-text-secondary); }
+.pc-legend { display: flex; gap: var(--cds-gap-md); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); flex-wrap: wrap; }
+.pc-sw { display: inline-block; width: 18px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 4px; }
+.pc-sw.pc-dash { border-top-style: dashed; }
+.pc-tbl-wrap { overflow: auto; max-height: 640px; }
+.pc-tbl { border-collapse: collapse; width: 100%; font-size: var(--cds-font-size-caption); font-variant-numeric: tabular-nums; }
+.pc-tbl th, .pc-tbl td { padding: 6px 10px; border-bottom: 1px solid var(--color-border-line); text-align: right; white-space: nowrap; }
+.pc-tbl th:first-child, .pc-tbl td:first-child, .pc-tbl th:nth-child(2), .pc-tbl td:nth-child(2) { text-align: left; }
+.pc-tbl thead th { position: sticky; top: 0; background-color: var(--color-bg); color: var(--color-fg-muted); font-weight: var(--cds-font-weight-medium); cursor: pointer; user-select: none; }
+.pc-tbl th[aria-sort="descending"]::after { content: " ↓"; } .pc-tbl th[aria-sort="ascending"]::after { content: " ↑"; }
+.pc-pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; border: 1px solid currentColor; }
+.pc-notes summary { cursor: pointer; font-weight: var(--cds-font-weight-medium); }
+.pc-notes p, .pc-notes li { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); line-height: 1.55; }
+</style>
+
+<div class="pc">
+  <header id="overview">
+    <h1 class="pc-title">Path of Exile · Covens league market trends</h1>
+    <p class="pc-sub">poe.ninja Currency Exchange, PoE 1 · prices as of <span data-draw="asOf" data-source="divine" data-field="date" data-where="point=now">—</span> · 7-day outlook · <span class="pc-stamp" data-draw="stamp">—</span> <button class="pc-btn" id="pc-refresh" type="button" title="Load the newest prices the hourly refresh has published">↻ Refresh now</button> <span class="pc-stamp" id="pc-refresh-msg" role="status"></span></p>
+    <p class="pc-take" data-read lang="en">The Divine Orb trades at <b data-draw="divNow" data-source="divine" data-field="chaos" data-where="point=now">—</b> chaos, <b data-draw="divChg" data-source="divChange">—</b> since the league opened, and its latest daily move is <b data-draw="divLast" data-source="divLastDay">—</b>. Measured in Divines, <b data-draw="nGain" data-source="signalCounts" data-field="count" data-where="signal=Gain">—</b> of <b data-draw="nAll" data-source="itemCount">—</b> tracked items are on track to gain value this week and <b data-draw="nLose" data-source="signalCounts" data-field="count" data-where="signal=Lose">—</b> to lose it. The strongest heavily traded riser is <b data-draw="upName" data-source="topMovers" data-field="currency" data-where="dir=up">—</b> (<b data-draw="upPct" data-source="topMovers" data-field="forecast7dPct" data-where="dir=up">—</b>), and the steepest heavily traded faller is <b data-draw="downName" data-source="topMovers" data-field="currency" data-where="dir=down">—</b> (<b data-draw="downPct" data-source="topMovers" data-field="forecast7dPct" data-where="dir=down">—</b>).</p>
+  </header>
+
+  <div class="pc-tiles" id="tiles">
+    <div class="pc-card" id="tile-divine">
+      <div class="pc-k">Divine Orb price now</div>
+      <div class="pc-v"><span data-draw="tDiv" data-source="divine" data-field="chaos" data-where="point=now">—</span>c</div>
+      <div class="pc-d"><span data-draw="tDivChg" data-source="divChange">—</span> since league start</div>
+    </div>
+    <div class="pc-card" id="tile-divfc">
+      <div class="pc-k">Divine forecast · 7 days out</div>
+      <div class="pc-v"><span data-draw="tDivFc" data-source="divine" data-field="chaos" data-where="point=fc7">—</span>c</div>
+      <div class="pc-d">Mirror of Kalandra: <span data-draw="tMirror" data-source="items" data-field="priceChaos" data-where="currency=Mirror%20of%20Kalandra">—</span>c</div>
+    </div>
+    <div class="pc-card" id="tile-gain">
+      <div class="pc-k">Forecast to gain &gt;10% in Divines · next 7 days</div>
+      <div class="pc-v pc-good" data-draw="tGain" data-source="signalCounts" data-field="count" data-where="signal=Gain">—</div>
+      <div class="pc-d">items across all categories</div>
+    </div>
+    <div class="pc-card" id="tile-lose">
+      <div class="pc-k">Forecast to lose &gt;10% in Divines · next 7 days</div>
+      <div class="pc-v pc-bad" data-draw="tLose" data-source="signalCounts" data-field="count" data-where="signal=Lose">—</div>
+      <div class="pc-d">items across all categories</div>
+    </div>
+  </div>
+
+  <section id="divine">
+    <h2 class="pc-h2">Divine Orb price in chaos: actual and forecast</h2>
+    <p class="pc-cap">Chaos is losing value fast against Divine early in the league, so this sets the scale for every price below.</p>
+    <div class="pc-legend"><span><i class="pc-sw"></i>Actual</span><span><i class="pc-sw pc-dash"></i>Forecast</span></div>
+    <div class="pc-chart" id="divine-chart" data-draw="divChart" data-source="divine"></div>
+  </section>
+
+  <div class="pc-row pc-filterbar" id="filters">
+    <label for="pc-cat">Category</label>
+    <select class="dash-select" id="pc-cat" aria-label="Category" data-draw="catSel" data-source="items"></select>
+    <label for="pc-conf">Trading volume</label>
+    <select class="dash-select" id="pc-conf" aria-label="Trading volume filter">
+      <option value="all">All items</option>
+      <option value="mh" selected>Medium + high volume</option>
+      <option value="h">High volume only</option>
+    </select>
+  </div>
+
+  <section id="movers">
+    <h2 class="pc-h2">Biggest expected movers: 7-day forecast, measured in Divines</h2>
+    <p class="pc-cap">Top 12 expected gainers and losers for the category and volume chosen above. Faded bars are thinly traded (under 3,000c of daily volume), so treat those forecasts loosely. Click a bar to explore that item.</p>
+    <div class="pc-chart pc-tall" id="movers-chart" data-draw="moversChart" data-source="items"></div>
+  </section>
+
+  <section id="explore">
+    <h2 class="pc-h2">Explore one item</h2>
+    <p class="pc-cap">Price in chaos, actual and forecast. The forecast combines the item's own trend in Divines with the Divine forecast above.</p>
+    <div class="pc-row">
+      <label for="pc-pick">Item</label>
+      <select class="dash-select" id="pc-pick" aria-label="Item" data-draw="pick" data-source="items"></select>
+    </div>
+    <div class="pc-tiles">
+      <div class="pc-card"><div class="pc-k">Price now</div><div class="pc-v" data-draw="pPrice">—</div></div>
+      <div class="pc-card"><div class="pc-k">Change since first traded, in Divines</div><div class="pc-v" data-draw="p3d">—</div></div>
+      <div class="pc-card"><div class="pc-k">7-day forecast, in Divines</div><div class="pc-v" data-draw="pFc">—</div><div class="pc-d" data-draw="pSig">—</div></div>
+    </div>
+    <div class="pc-chart" id="pick-chart" data-draw="pickChart" data-source="history"></div>
+  </section>
+
+  <section id="table">
+    <h2 class="pc-h2">All items</h2>
+    <p class="pc-cap">Changes are measured in Divines, so the fall of chaos doesn't make everything look like a gainer. Uses the category and volume filters above. Click a column header to sort.</p>
+    <div class="pc-row">
+      <label for="pc-sig">Signal</label>
+      <select class="dash-select" id="pc-sig" aria-label="Signal filter">
+        <option value="">All</option>
+        <option value="Gain">Gain</option>
+        <option value="Hold">Hold</option>
+        <option value="Lose">Lose</option>
+      </select>
+      <input class="pc-search" id="pc-q" type="search" placeholder="Search items" aria-label="Search items">
+      <span class="pc-cap" style="margin: 0" data-draw="tblCount">—</span>
+    </div>
+    <div class="pc-tbl-wrap">
+      <table class="pc-tbl" id="all-table" data-source="items" data-row-key="currency">
+        <thead><tr>
+          <th data-field="currency" data-k="currency">Item</th>
+          <th data-field="category" data-k="category">Category</th>
+          <th data-field="priceChaos" data-k="priceChaos">Price (c)</th>
+          <th data-field="changeSinceStartPct" data-k="changeSinceStartPct">Since first traded</th>
+          <th data-field="change1dPct" data-k="change1dPct">Last day</th>
+          <th data-field="forecast7dPct" data-k="forecast7dPct" aria-sort="descending">7-day forecast</th>
+          <th data-field="signal" data-k="signal">Signal</th>
+          <th data-field="trend" data-k="trend">Momentum</th>
+          <th data-field="volumeChaos" data-k="volumeChaos">Daily volume (c)</th>
+          <th data-field="confidence" data-k="confidence">Confidence</th>
+        </tr></thead>
+        <tbody data-draw="tbl"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <details class="pc-notes" id="method">
+    <summary>How the forecast works, and its limits</summary>
+    <p>Data: poe.ninja's Currency Exchange for the PoE 1 Covens league: Currency, Fragments, Essences, Fossils, Resonators, Oils, Delirium Orbs, Omens, Tattoos, Artifacts, Divination Cards, Runegrafts, Allflame Embers and Astrolabes. A GitHub Actions job pulls fresh prices every hour. Items trading under 50 chaos a day are left out because their prices are mostly noise. Scarabs have no exchange data in this league yet. Each item's daily price is converted to Divines first, because chaos itself is falling fast against Divine.</p>
+    <p>Forecast: a damped-momentum model. Each item's expected daily move is 75% of its last day's change plus 25% of the day before (in log terms). That move then shrinks by 45% each day over the next seven. "Gain" means more than +10% in Divines over 7 days, "Lose" means more than −10%, and anything between is "Hold". Confidence follows daily traded volume: High is 20,000c or more, Medium 3,000c or more, Low is below that. Items with only two days of trading are capped at Medium.</p>
+    <ul>
+      <li>poe.ninja's price history is daily, so an hourly refresh mainly updates today's price. The forecast is a short-term momentum read, not a model of game mechanics. A patch, a farming-strategy discovery or a crafting meta shift can flip any of these in hours.</li>
+      <li>League-start prices are noisy. Catalysts, Oils, Lifeforce and basic orbs usually keep sliding as supply floods in. Crafting items tied to new mechanics usually rise until the meta settles.</li>
+    </ul>
+  </details>
+  <p class="pc-cap">Data from <a href="https://poe.ninja/poe1/economy/covens/currency">poe.ninja</a>. Not affiliated with Grinding Gear Games or poe.ninja. Source: <a href="https://github.com/Strix-YT/poe-market-trends">github.com/Strix-YT/poe-market-trends</a></p>
+</div>
+
+<script>
+(() => {
+
+window.pc = window.pc || {};
+pc.fmtC = (v) => v == null || isNaN(v) ? '—' : v >= 100 ? d3.format(',.0f')(v) : v >= 1 ? d3.format(',.2~f')(v) : d3.format('.3~r')(v);
+pc.pct = (v) => v == null || isNaN(v) ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + d3.format('.1f')(Math.abs(v)) + '%';
+pc.sigColor = (s) => s === 'Gain' ? 'var(--color-ok)' : s === 'Lose' ? 'var(--color-bad)' : 'var(--color-fg-muted)';
+pc.parse = d3.utcParse('%Y-%m-%d');
+pc.dfmt = d3.utcFormat('%-d %b');
+pc.conf = 'mh'; pc.cat = ''; pc.sig = ''; pc.q = '';
+pc.sortKey = 'forecast7dPct'; pc.sortDir = -1;
+pc.pickName = null;
+pc.inFilter = (r) => (!pc.cat || r.category === pc.cat) && (pc.conf === 'all' || (pc.conf === 'mh' ? r.confidence !== 'Low' : r.confidence === 'High'));
+document.querySelectorAll('.pc-sw').forEach((s) => { s.style.borderColor = dash.colors[0]; });
+
+dash.calc('divChange', {
+  title: 'Divine Orb change since league start',
+  description: 'Percent change of the Divine Orb price in chaos from the first to the latest day.',
+  inputs: ['divine'],
+  fn: (divine) => { const a = divine.filter((r) => r.kind === 'Actual'); return a.length < 2 ? null : (a[a.length - 1].chaos / a[0].chaos - 1) * 100; }
+});
+dash.calc('divLastDay', {
+  title: 'Divine Orb change over the last day',
+  description: 'Percent change of the Divine Orb price in chaos between the last two days.',
+  inputs: ['divine'],
+  fn: (divine) => { const a = divine.filter((r) => r.kind === 'Actual'); return a.length < 2 ? null : (a[a.length - 1].chaos / a[a.length - 2].chaos - 1) * 100; }
+});
+dash.calc('itemCount', {
+  title: 'Items tracked',
+  description: 'Number of items with a forecast.',
+  inputs: ['items'],
+  fn: (items) => items.length
+});
+dash.calc('signalCounts', {
+  title: 'Items per forecast signal',
+  description: 'How many items are forecast to Gain, Hold or Lose over 7 days.',
+  inputs: ['items'],
+  fn: (items) => ['Gain', 'Hold', 'Lose'].map((s) => ({ signal: s, count: items.filter((r) => r.signal === s).length }))
+});
+dash.calc('topMovers', {
+  title: 'Strongest high-volume riser and faller',
+  description: 'Among High-confidence items (20,000c+ daily volume), the largest and smallest 7-day forecast.',
+  inputs: ['items'],
+  fn: (items) => {
+    const h = items.filter((r) => r.confidence === 'High');
+    if (!h.length) return [];
+    const up = h.reduce((a, b) => (b.forecast7dPct > a.forecast7dPct ? b : a));
+    const dn = h.reduce((a, b) => (b.forecast7dPct < a.forecast7dPct ? b : a));
+    return [{ dir: 'up', currency: up.currency, forecast7dPct: up.forecast7dPct }, { dir: 'down', currency: dn.currency, forecast7dPct: dn.forecast7dPct }];
+  }
+});
+
+const redrawFiltered = () => ['moversChart', 'tbl', 'tblCount', 'pick', 'pickChart', 'pPrice', 'p3d', 'pFc', 'pSig'].forEach((n) => dash.draw(n));
+document.querySelectorAll('#pc-conf').forEach((s) => s.addEventListener('change', () => { pc.conf = s.value; redrawFiltered(); }));
+document.querySelectorAll('#pc-sig').forEach((s) => s.addEventListener('change', () => { pc.sig = s.value; dash.draw('tbl'); dash.draw('tblCount'); }));
+document.querySelectorAll('#pc-q').forEach((s) => s.addEventListener('input', () => { pc.q = s.value.trim().toLowerCase(); dash.draw('tbl'); dash.draw('tblCount'); }));
+document.querySelectorAll('#all-table th[data-k]').forEach((th) => th.addEventListener('click', () => {
+  const k = th.getAttribute('data-k');
+  if (pc.sortKey === k) pc.sortDir = -pc.sortDir; else { pc.sortKey = k; pc.sortDir = ['currency', 'category', 'signal', 'trend', 'confidence'].includes(k) ? 1 : -1; }
+  document.querySelectorAll('#all-table th[data-k]').forEach((h) => h.setAttribute('aria-sort', h.getAttribute('data-k') === pc.sortKey ? (pc.sortDir < 0 ? 'descending' : 'ascending') : 'none'));
+  dash.draw('tbl');
+}));
+
+pc.textDraw = (name, getter) => dash.draw(name, (el) => { const v = getter(); el.textContent = v == null ? '—' : v; });
+const rowsOf = (id) => { const d = dash.data(id); return d.status === 'ok' && Array.isArray(d.data) ? d.data : null; };
+const one = (id, pred, key) => { const rs = rowsOf(id); if (!rs) return null; const r = rs.find(pred); return r ? r[key] : null; };
+const divPt = (p) => one('divine', (r) => r.point === p, 'chaos');
+const cnt = (s) => one('signalCounts', (r) => r.signal === s, 'count');
+const topMv = (dir, key) => one('topMovers', (r) => r.dir === dir, key);
+const calcVal = (id) => { const d = dash.data(id); return d.status === 'ok' && d.data != null ? d.data : null; };
+
+document.querySelectorAll('#pc-refresh').forEach((b) => b.addEventListener('click', async () => {
+  const before = dash.meta.generatedAt; b.disabled = true; b.textContent = '↻ Refreshing…';
+  const msg = document.getElementById('pc-refresh-msg'); if (msg) msg.textContent = '';
+  await dash.reload();
+  b.disabled = false; b.textContent = '↻ Refresh now';
+  if (msg) { msg.textContent = dash.meta.generatedAt !== before ? 'Updated to the latest prices.' : 'Already up to date. New prices are pulled from poe.ninja every hour.'; setTimeout(() => { msg.textContent = ''; }, 6000); }
+}));
+pc.textDraw('stamp', () => dash.meta.generatedAt ? 'data refreshed ' + d3.utcFormat('%-d %b, %H:%M UTC')(new Date(dash.meta.generatedAt)) : null);
+pc.textDraw('asOf', () => { const v = one('divine', (r) => r.point === 'now', 'date'); return v ? d3.utcFormat('%-d %b %Y')(pc.parse(v)) : null; });
+pc.textDraw('divNow', () => { const v = divPt('now'); return v == null ? null : pc.fmtC(v); });
+pc.textDraw('tDiv', () => { const v = divPt('now'); return v == null ? null : pc.fmtC(v); });
+pc.textDraw('tDivFc', () => { const v = divPt('fc7'); return v == null ? null : pc.fmtC(v); });
+pc.textDraw('tMirror', () => { const v = one('items', (r) => r.currency === 'Mirror of Kalandra', 'priceChaos'); return v == null ? null : pc.fmtC(v); });
+pc.textDraw('divChg', () => { const v = calcVal('divChange'); return v == null ? null : pc.pct(v); });
+pc.textDraw('tDivChg', () => { const v = calcVal('divChange'); return v == null ? null : pc.pct(v); });
+pc.textDraw('divLast', () => { const v = calcVal('divLastDay'); return v == null ? null : pc.pct(v); });
+pc.textDraw('nAll', () => calcVal('itemCount'));
+pc.textDraw('nGain', () => cnt('Gain'));
+pc.textDraw('nLose', () => cnt('Lose'));
+pc.textDraw('tGain', () => cnt('Gain'));
+pc.textDraw('tLose', () => cnt('Lose'));
+pc.textDraw('upName', () => topMv('up', 'currency'));
+pc.textDraw('downName', () => topMv('down', 'currency'));
+pc.textDraw('upPct', () => { const v = topMv('up', 'forecast7dPct'); return v == null ? null : pc.pct(v); });
+pc.textDraw('downPct', () => { const v = topMv('down', 'forecast7dPct'); return v == null ? null : pc.pct(v); });
+
+dash.draw('catSel', (sel) => {
+  const rs = rowsOf('items') || [];
+  const cats = [...new Set(rs.map((r) => r.category))].sort();
+  sel.replaceChildren(new Option('All categories', ''), ...cats.map((c) => new Option(c, c)));
+  sel.value = pc.cat;
+  sel.onchange = () => { pc.cat = sel.value; redrawFiltered(); };
+});
+
+pc.lineChart = (el, rows, opts) => {
+  el.replaceChildren();
+  const W = Math.max(280, el.clientWidth), H = 260;
+  const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', opts.aria);
+  const pts = rows.map((r) => ({ ...r, t: pc.parse(r.date), v: +r.v })).filter((r) => r.t && isFinite(r.v));
+  if (!pts.length) return;
+  const y = d3.scaleLinear().domain([0, d3.max(pts, (d) => d.v) * 1.08]).nice();
+  const probe = svg.append('text').attr('class', 'pc-lab').text(pc.fmtC(y.domain()[1]));
+  const ml = Math.ceil(probe.node().getComputedTextLength()) + 12; probe.remove();
+  const m = { t: 10, r: 16, b: 26, l: ml };
+  const x = d3.scaleUtc().domain(d3.extent(pts, (d) => d.t)).range([m.l, W - m.r]);
+  y.range([H - m.b, m.t]);
+  svg.append('g').attr('class', 'pc-grid').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickSize(-(W - m.l - m.r)).tickFormat(''));
+  svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickFormat(pc.fmtC)).call((g) => g.select('.domain').remove());
+  const nDays = d3.utcDay.count(...x.domain());
+  svg.append('g').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).ticks(d3.utcDay.every(Math.max(1, Math.ceil(nDays / (W < 500 ? 5 : 10))))).tickFormat(pc.dfmt));
+  const line = d3.line().x((d) => x(d.t)).y((d) => y(d.v));
+  const act = pts.filter((d) => d.kind === 'Actual'), fc = pts.filter((d) => d.kind === 'Forecast');
+  const col = opts.color || dash.colors[0];
+  svg.append('path').datum(act).attr('fill', 'none').attr('stroke-width', 2.5).style('stroke', col).attr('d', line);
+  svg.append('path').datum(fc).attr('fill', 'none').attr('stroke-width', 2).attr('stroke-dasharray', '5 4').style('stroke', col).attr('d', line);
+  svg.append('g').selectAll('circle').data(act).join('circle').attr('cx', (d) => x(d.t)).attr('cy', (d) => y(d.v)).attr('r', 3.5).style('fill', col);
+  if (act.length) { const lx = x(act[act.length - 1].t); svg.append('line').attr('x1', lx).attr('x2', lx).attr('y1', m.t).attr('y2', H - m.b).style('stroke', 'var(--cds-chart-reference)').attr('stroke-dasharray', '2 3'); }
+  const tip = d3.select(el).append('div').attr('class', 'pc-tip').style('display', 'none');
+  const dot = svg.append('circle').attr('r', 5).style('fill', 'none').style('stroke', col).attr('stroke-width', 2).style('display', 'none');
+  const uniq = d3.groups(pts, (d) => d.date).map(([, g]) => g.find((p) => p.kind === 'Actual') || g[0]);
+  svg.append('rect').attr('x', m.l).attr('y', m.t).attr('width', W - m.l - m.r).attr('height', H - m.t - m.b).style('fill', 'transparent')
+    .on('pointermove', (ev) => {
+      const [mx] = d3.pointer(ev);
+      const p = uniq.reduce((a, b) => Math.abs(x(b.t) - mx) < Math.abs(x(a.t) - mx) ? b : a);
+      dot.style('display', null).attr('cx', x(p.t)).attr('cy', y(p.v));
+      tip.style('display', null).selectAll('*').remove();
+      tip.append('div').text(`${pc.dfmt(p.t)} · ${p.kind}`).attr('class', 'pc-tk');
+      tip.append('div').text(`${pc.fmtC(p.v)} chaos`);
+      const tw = tip.node().offsetWidth, sx = x(p.t) / W * el.clientWidth;
+      tip.style('left', Math.max(0, Math.min(el.clientWidth - tw, sx - tw / 2)) + 'px').style('top', Math.max(0, y(p.v) / H * el.getBoundingClientRect().height - 52) + 'px');
+    })
+    .on('pointerleave', () => { tip.style('display', 'none'); dot.style('display', 'none'); });
+};
+
+pc.placeholder = (el, d) => { el.replaceChildren(); if (d.status === 'error') { const p = document.createElement('p'); p.className = 'pc-cap'; p.textContent = 'Failed to load'; el.append(p); } };
+
+dash.draw('divChart', (el) => {
+  const d = dash.data('divine');
+  if (d.status !== 'ok') return pc.placeholder(el, d);
+  pc.lineChart(el, d.data.map((r) => ({ date: r.date, kind: r.kind, v: r.chaos })), { aria: 'Line chart of Divine Orb price in chaos, actual since league start and 7-day forecast' });
+});
+
+dash.draw('moversChart', (el) => {
+  const d = dash.data('items');
+  if (d.status !== 'ok') return pc.placeholder(el, d);
+  el.replaceChildren();
+  const rows = d.data.filter(pc.inFilter);
+  const gain = rows.filter((r) => r.forecast7dPct > 0).sort((a, b) => b.forecast7dPct - a.forecast7dPct).slice(0, 12);
+  const lose = rows.filter((r) => r.forecast7dPct < 0).sort((a, b) => a.forecast7dPct - b.forecast7dPct).slice(0, 12).reverse();
+  const data = [...gain, ...lose];
+  if (!data.length) { const p = document.createElement('p'); p.className = 'pc-cap'; p.textContent = 'No items match these filters.'; el.append(p); return; }
+  const W = Math.max(300, el.clientWidth), bh = 19, gap = 18;
+  const H = data.length * bh + gap + 30;
+  const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', 'Bar chart of items with the largest expected 7-day gains and losses in Divine terms');
+  const maxName = W < 480 ? 16 : 32;
+  const nm = (s) => s.length > maxName ? s.slice(0, maxName - 1) + '…' : s;
+  const probe = svg.append('g');
+  let ml = 0; data.forEach((r) => { const t = probe.append('text').attr('class', 'pc-lab').text(nm(r.currency)); ml = Math.max(ml, t.node().getComputedTextLength()); });
+  probe.remove(); ml = Math.ceil(ml) + 10;
+  const ext = d3.max(data, (r) => Math.abs(r.forecast7dPct));
+  const vprobe = svg.append('text').attr('class', 'pc-lab').text(pc.pct(-ext)); const vw = vprobe.node().getComputedTextLength() + 8; vprobe.remove();
+  const m = { t: 4, r: vw, b: 26, l: ml + vw };
+  const x = d3.scaleLinear().domain([-ext, ext]).range([m.l, W - m.r]).nice();
+  const yPos = (i) => m.t + i * bh + (i >= gain.length ? gap : 0);
+  svg.append('g').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).ticks(W < 480 ? 4 : 7).tickFormat((v) => (v > 0 ? '+' : '') + v + '%'));
+  svg.append('line').attr('x1', x(0)).attr('x2', x(0)).attr('y1', m.t).attr('y2', H - m.b).style('stroke', 'var(--cds-chart-reference)');
+  const g = svg.append('g').selectAll('g').data(data).join('g').attr('transform', (r, i) => `translate(0,${yPos(i)})`);
+  g.append('text').attr('class', 'pc-lab').attr('x', m.l - vw - 6).attr('y', bh / 2).attr('dy', '0.35em').attr('text-anchor', 'end').style('fill', 'var(--color-fg)').text((r) => nm(r.currency));
+  g.append('rect').attr('x', (r) => Math.min(x(0), x(r.forecast7dPct))).attr('y', 2).attr('height', bh - 4)
+    .attr('width', (r) => Math.abs(x(r.forecast7dPct) - x(0))).attr('rx', 2)
+    .style('fill', (r) => pc.sigColor(r.forecast7dPct > 0 ? 'Gain' : 'Lose')).style('opacity', (r) => r.confidence === 'Low' ? 0.35 : r.confidence === 'Medium' ? 0.7 : 1);
+  g.append('text').attr('class', 'pc-lab').attr('y', bh / 2).attr('dy', '0.35em')
+    .attr('x', (r) => r.forecast7dPct > 0 ? x(r.forecast7dPct) + 4 : x(r.forecast7dPct) - 4)
+    .attr('text-anchor', (r) => r.forecast7dPct > 0 ? 'start' : 'end').text((r) => pc.pct(r.forecast7dPct));
+  const tip = d3.select(el).append('div').attr('class', 'pc-tip').style('display', 'none');
+  g.append('rect').attr('x', 0).attr('width', W).attr('height', bh).style('fill', 'transparent').style('cursor', 'pointer')
+    .on('pointermove', (ev, r) => {
+      tip.style('display', null).selectAll('*').remove();
+      tip.append('div').text(r.currency).style('font-weight', '600');
+      tip.append('div').text(`7-day forecast: ${pc.pct(r.forecast7dPct)}`);
+      tip.append('div').attr('class', 'pc-tk').text(`${r.category} · price ${pc.fmtC(r.priceChaos)}c · since first traded ${pc.pct(r.changeSinceStartPct)}`);
+      tip.append('div').attr('class', 'pc-tk').text(`Volume ${d3.format(',')(r.volumeChaos)}c/day · ${r.confidence} confidence`);
+      const [px, py] = d3.pointer(ev, el); const tw = tip.node().offsetWidth;
+      tip.style('left', Math.max(0, Math.min(el.clientWidth - tw, px + 12)) + 'px').style('top', (py + 14) + 'px');
+    })
+    .on('pointerleave', () => tip.style('display', 'none'))
+    .on('click', (ev, r) => { pc.pickName = r.currency; ['pick', 'pickChart', 'pPrice', 'p3d', 'pFc', 'pSig'].forEach((n) => dash.draw(n)); const s = document.getElementById('explore'); if (s) s.scrollIntoView({ behavior: 'smooth' }); });
+});
+
+pc.pickRow = () => {
+  const rs = rowsOf('items'); if (!rs) return null;
+  const pool = rs.filter(pc.inFilter);
+  const base = pool.length ? pool : rs;
+  if (!pc.pickName || !base.some((r) => r.currency === pc.pickName)) {
+    const hi = base.filter((r) => r.confidence !== 'Low').sort((a, b) => b.forecast7dPct - a.forecast7dPct);
+    pc.pickName = (hi[0] || base[0]).currency;
+  }
+  return rs.find((r) => r.currency === pc.pickName);
+};
+dash.draw('pick', (sel) => {
+  const rs = rowsOf('items') || [];
+  const pool = rs.filter(pc.inFilter);
+  const list = (pool.length ? pool : rs).slice().sort((a, b) => a.currency.localeCompare(b.currency));
+  sel.replaceChildren(...list.map((r) => new Option(r.currency, r.currency)));
+  const pr = pc.pickRow(); if (pr) sel.value = pr.currency;
+  sel.onchange = () => { pc.pickName = sel.value; ['pickChart', 'pPrice', 'p3d', 'pFc', 'pSig'].forEach((n) => dash.draw(n)); };
+});
+const pickMark = (el, field) => { const r = pc.pickRow(); if (!r) { el.removeAttribute('data-source'); return null; } el.setAttribute('data-source', 'items'); el.setAttribute('data-field', field); el.setAttribute('data-where', 'currency=' + encodeURIComponent(r.currency)); return r; };
+dash.draw('pPrice', (el) => { const r = pickMark(el, 'priceChaos'); el.textContent = r ? pc.fmtC(r.priceChaos) + 'c' : '—'; });
+dash.draw('p3d', (el) => { const r = pickMark(el, 'changeSinceStartPct'); el.textContent = r ? pc.pct(r.changeSinceStartPct) : '—'; el.style.color = r ? (r.changeSinceStartPct >= 0 ? 'var(--color-ok)' : 'var(--color-bad)') : ''; });
+dash.draw('pFc', (el) => { const r = pickMark(el, 'forecast7dPct'); el.textContent = r ? pc.pct(r.forecast7dPct) : '—'; el.style.color = r ? pc.sigColor(r.signal) : ''; });
+dash.draw('pSig', (el) => { const r = pickMark(el, 'signal'); el.textContent = r ? `${r.signal} · ${r.confidence} confidence · ${r.trend.toLowerCase()} · ${r.category}` : '—'; });
+dash.draw('pickChart', (el) => {
+  const d = dash.data('history');
+  if (d.status !== 'ok') return pc.placeholder(el, d);
+  const r = pc.pickRow(); if (!r) return pc.placeholder(el, d);
+  const rows = d.data.filter((h) => h.currency === r.currency).map((h) => ({ date: h.date, kind: h.kind, v: h.chaos }));
+  pc.lineChart(el, rows, { aria: `Line chart of ${r.currency} price in chaos, actual and 7-day forecast`, color: r.signal === 'Hold' ? dash.colors[0] : pc.sigColor(r.signal) });
+});
+
+pc.tableRows = () => {
+  const rs = rowsOf('items'); if (!rs) return null;
+  const k = pc.sortKey, dir = pc.sortDir;
+  return rs.filter((r) => pc.inFilter(r) && (!pc.sig || r.signal === pc.sig) && (!pc.q || r.currency.toLowerCase().includes(pc.q))).sort((a, b) => {
+    const av = a[k], bv = b[k];
+    return (typeof av === 'number' ? av - bv : String(av).localeCompare(String(bv))) * dir;
+  });
+};
+dash.draw('tblCount', (el) => { const rs = pc.tableRows(); el.textContent = rs ? `${rs.length} items` : '—'; });
+dash.draw('tbl', (tb) => {
+  tb.replaceChildren();
+  const rows = pc.tableRows(); if (!rows) return;
+  rows.forEach((r) => {
+    const tr = document.createElement('tr'); tr.setAttribute('data-key', encodeURIComponent(r.currency));
+    const td = (txt, style) => { const c = document.createElement('td'); c.textContent = txt; if (style) Object.assign(c.style, style); tr.append(c); return c; };
+    td(r.currency);
+    td(r.category);
+    td(pc.fmtC(r.priceChaos));
+    td(pc.pct(r.changeSinceStartPct), { color: r.changeSinceStartPct >= 0 ? 'var(--color-ok)' : 'var(--color-bad)' });
+    td(pc.pct(r.change1dPct), { color: r.change1dPct >= 0 ? 'var(--color-ok)' : 'var(--color-bad)' });
+    td(pc.pct(r.forecast7dPct), { color: pc.sigColor(r.signal), fontWeight: '600' });
+    const sc = td(''); const pill = document.createElement('span'); pill.className = 'pc-pill'; pill.textContent = r.signal; pill.style.color = pc.sigColor(r.signal); sc.append(pill);
+    td(r.trend);
+    td(d3.format(',')(r.volumeChaos));
+    td(r.confidence);
+    tb.append(tr);
+  });
+});
+dash.boot();
+})();
+</script>
+</div></body></html>
