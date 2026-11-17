@@ -17,8 +17,8 @@ Gain / Lose = forecast beyond +/-10% in Divines over 7 days.
 
 Outputs in out_dir:
   market.json  - everything the page needs (compact keys, see build())
-  hourly.json  - rolling 48 h of hourly chaos prices, appended to the copy at $PREV_HOURLY_URL
-  items.json, history.json, divine.json - legacy files for the older page layout
+  hourly.json  - rolling 48 h of hourly prices: 'fx' = GGG currency exchange (Faustus) VWAP, volume and
+                 low/high rate per completed hour; 'nj' = poe.ninja snapshots (used for Uniques and cards)
 """
 import datetime
 import json
@@ -52,6 +52,10 @@ UNIQUE_TYPES = {
     "UniqueTincture": "Unique Tinctures", "UniqueMap": "Unique Maps",
 }
 BASE = "https://poe.ninja/poe1/api/economy"
+FX = "https://web.poecdn.com/api/currency-exchange"
+CHAOS_ID = "Metadata/Items/Currency/CurrencyRerollRare"
+DIVINE_ID = "Metadata/Items/Currency/CurrencyModValues"
+ART_NAMES = {}   # poe.ninja art file name -> item names (filled while fetching)
 UA = "poe-market-trends (github.com/Strix-YT/poe-market-trends; hourly)"
 
 
@@ -81,6 +85,10 @@ def fetch_all():
                 raise
             continue
         names = {i["id"]: i["name"] for i in (j.get("items") or [])}
+        for i in j.get("items") or []:
+            art = os.path.splitext(os.path.basename(i.get("image") or ""))[0]
+            if art:
+                ART_NAMES.setdefault(art, set()).add(i["name"])
         for l in j.get("lines") or []:
             if l["id"] == "chaos":
                 continue
@@ -119,6 +127,99 @@ def fetch_all():
         if seen[r["name"]] > 1:
             r["name"] = f"{r['name']} #{seen[r['name']]}"
     return recs
+
+
+
+# ----------------------------------------------------------------------------- Faustus (GGG currency exchange)
+
+def fx_hour(h):
+    """One hourly digest from GGG's currency exchange, or None if that hour is not published yet."""
+    j = get(f"{FX}/{h}")
+    if not j or int(j.get("next_change_id") or 0) <= h:
+        return None
+    return j
+
+
+def fx_prices(j):
+    """Per item (metadata id): chaos VWAP, chaos volume, low and high rate, for LEAGUE in one hour."""
+    mk = [m for m in j.get("markets") or [] if m.get("league") == LEAGUE]
+    out = {}
+
+    def add(x, other, rate_other):
+        for m in mk:
+            if other in m["market_pair"] and x in m["market_pair"]:
+                vo, vx = m["volume_traded"].get(other, 0), m["volume_traded"].get(x, 0)
+                if vo <= 0 or vx <= 0:
+                    return None
+                p = vo / vx * rate_other
+                rates = []
+                for key in ("lowest_ratio", "highest_ratio"):
+                    r = m.get(key) or {}
+                    if r.get(other) and r.get(x):
+                        rates.append(r[other] / r[x] * rate_other)
+                return {"p": p, "v": vo * rate_other, "lo": min(rates) if rates else None, "hi": max(rates) if rates else None}
+        return None
+
+    div = add(DIVINE_ID, CHAOS_ID, 1.0)
+    if div:            # pair is stored as chaos per divine
+        out[DIVINE_ID] = div
+    divrate = div["p"] if div else None
+    ids = {i for m in mk for i in m["market_pair"]} - {CHAOS_ID, DIVINE_ID}
+    for x in ids:
+        r = add(x, CHAOS_ID, 1.0)
+        if not r and divrate:
+            r = add(x, DIVINE_ID, divrate)
+        if r:
+            out[x] = r
+    return out
+
+
+def fx_name(meta_id):
+    if meta_id == DIVINE_ID:
+        return "Divine Orb"
+    names = ART_NAMES.get(meta_id.rsplit("/", 1)[-1])
+    return next(iter(names)) if names and len(names) == 1 else None
+
+
+def update_fx(prev, now, keep=HOURLY_KEEP_HOURS):
+    """Rolling hourly Faustus series {t, s, v, lo, hi}; fills any missing hour in the window."""
+    last = int(now.timestamp()) // 3600 * 3600 - 3600
+    want = [last - 3600 * k for k in range(keep - 1, -1, -1)]
+    stamp = lambda h: datetime.datetime.fromtimestamp(h, datetime.timezone.utc).isoformat(timespec="minutes")
+    have = {t: i for i, t in enumerate(prev.get("t") or [])}
+    cols = {k: prev.get(k) or {} for k in ("s", "v", "lo", "hi")}
+    rows = {}
+    fetched = missing = 0
+    for h in want:
+        t = stamp(h)
+        if t in have:
+            i = have[t]
+            rows[t] = {k: {n: (v[i] if i < len(v) else None) for n, v in cols[k].items()} for k in cols}
+            continue
+        try:
+            j = fx_hour(h)
+        except Exception as e:
+            print(f"warn: faustus {t}: {e}", file=sys.stderr)
+            j = None
+        if not j:
+            missing += 1
+            continue
+        fetched += 1
+        rec = {"s": {}, "v": {}, "lo": {}, "hi": {}}
+        for mid, r in fx_prices(j).items():
+            n = fx_name(mid)
+            if n:
+                rec["s"][n], rec["v"][n] = r4(r["p"]), round(r["v"])
+                rec["lo"][n], rec["hi"][n] = r4(r["lo"]), r4(r["hi"])
+        rows[t] = rec
+        time.sleep(0.2)
+    times = sorted(rows)
+    names = sorted({n for t in times for n in rows[t]["s"]})
+    out = {"t": times}
+    for k in ("s", "v", "lo", "hi"):
+        out[k] = {n: [rows[t][k].get(n) for t in times] for n in names}
+    print(f"faustus: {fetched} hours fetched, {missing} unavailable, {len(times)} in window, {len(names)} items mapped")
+    return out
 
 
 # ----------------------------------------------------------------------------- model
@@ -224,36 +325,6 @@ def build(recs, now):
     return market, div
 
 
-def legacy(market, out_dir):
-    """Files for the original page layout (exchange items only)."""
-    days, fdays = market["days"], market["fdays"]
-    dh, dfc = market["divine"]["h"], market["divine"]["f"]
-    gen = market["generatedAt"]
-    items, history = [], []
-    for it in market["items"]:
-        if it["g"] != "Exchange" or it["sig"] == "New":
-            continue
-        first = next(i for i, x in enumerate(it["h"]) if x is not None)
-        items.append(dict(currency=it["n"], category=it["c"], priceChaos=it["p"], valueDiv=it["dv"],
-                          volumeChaos=it["v"], firstDay=days[first], changeSinceStartPct=it["chg"],
-                          change1dPct=it["d1"], forecast7dPct=it["f7"], signal=it["sig"], confidence=it["conf"],
-                          trend=it["tr"], days=sum(x is not None for x in it["h"])))
-        last = max(i for i, x in enumerate(it["h"]) if x is not None)
-        for i, x in enumerate(it["h"]):
-            if x is not None:
-                history.append(dict(currency=it["n"], date=days[i], kind="Actual", chaos=x))
-        history.append(dict(currency=it["n"], date=days[last], kind="Forecast", chaos=it["h"][last]))
-        for k, x in enumerate(it["f"]):
-            history.append(dict(currency=it["n"], date=fdays[k], kind="Forecast", chaos=x))
-    divine = [dict(date=days[i], kind="Actual", chaos=v, point="now" if i == 6 else ("start" if i == 0 else ""))
-              for i, v in enumerate(dh) if v is not None]
-    divine.append(dict(date=days[-1], kind="Forecast", chaos=dh[-1], point=""))
-    divine += [dict(date=fdays[k], kind="Forecast", chaos=v, point="fc7" if k == 6 else "") for k, v in enumerate(dfc)]
-    for name, rows in [("items", items), ("history", history), ("divine", divine)]:
-        with open(f"{out_dir}/{name}.json", "w") as fh:
-            json.dump({"generatedAt": gen, "rows": rows}, fh, separators=(",", ":"))
-
-
 def update_hourly(market, div, now, prev):
     """Append this run's prices to the rolling hourly series."""
     stamp = now.replace(minute=0, second=0, microsecond=0).isoformat(timespec="minutes")
@@ -279,6 +350,34 @@ def update_hourly(market, div, now, prev):
     return {"t": times, "s": series}
 
 
+def attach_hourly(market, fx, nj):
+    """Add 1h/6h/24h changes, last-hour volume and a 24-point sparkline to each item."""
+    def pct(arr, k):
+        idx = [i for i, x in enumerate(arr) if x is not None]
+        if not idx:
+            return None
+        i = idx[-1]
+        if i - k < 0 or arr[i - k] in (None, 0):
+            return None
+        return round((arr[i] / arr[i - k] - 1) * 100, 1)
+    used = Counter()
+    for it in market["items"] + [{"n": "Divine Orb", "_div": True}]:
+        arr, src = (fx["s"].get(it["n"]), "fx")
+        if not arr or sum(x is not None for x in arr) < 2:
+            arr, src = nj["s"].get(it["n"]) or [], "nj"
+        used[src] += 1
+        out = {"src": src, "c1": pct(arr, 1), "c6": pct(arr, 6), "c24": pct(arr, 24), "sp": arr[-24:]}
+        if src == "fx":
+            vol = fx["v"].get(it["n"]) or []
+            out["vh"] = vol[-1] if vol else None
+        if it.get("_div"):
+            market["divine"].update(out)
+        else:
+            it.update(out)
+    market["hourly"] = {"fxHours": len(fx["t"]), "njHours": len(nj["t"]),
+                        "fxLast": fx["t"][-1] if fx["t"] else None, "sources": dict(used)}
+
+
 def load_prev_hourly():
     if not PREV_HOURLY_URL:
         return {}
@@ -298,12 +397,19 @@ if __name__ == "__main__":
     else:
         recs = fetch_all()
     market, div = build(recs, now)
+    prev = load_prev_hourly()
+    if "nj" not in prev and "t" in prev:          # first-generation file: poe.ninja snapshots only
+        prev = {"nj": prev}
+    nj = update_hourly(market, div, now, prev.get("nj") or {})
+    if os.environ.get("SKIP_FAUSTUS"):
+        fx = prev.get("fx") or {"t": [], "s": {}, "v": {}, "lo": {}, "hi": {}}
+    else:
+        fx = update_fx(prev.get("fx") or {}, now)
+    attach_hourly(market, fx, nj)
     with open(f"{out_dir}/market.json", "w") as fh:
         json.dump(market, fh, separators=(",", ":"))
-    legacy(market, out_dir)
-    hourly = update_hourly(market, div, now, load_prev_hourly())
     with open(f"{out_dir}/hourly.json", "w") as fh:
-        json.dump(hourly, fh, separators=(",", ":"))
+        json.dump({"generatedAt": market["generatedAt"], "nj": nj, "fx": fx}, fh, separators=(",", ":"))
     c = Counter((it["g"], it["sig"]) for it in market["items"])
-    print(f"{now:%Y-%m-%d %H:%M}Z {len(market['items'])} items {dict(c)}; "
-          f"divine {div['price']} -> {market['divine']['f'][-1]}; hourly points {len(hourly['t'])}")
+    print(f"{now:%Y-%m-%d %H:%M}Z {len(market['items'])} items {dict(c)}; divine {div['price']} -> "
+          f"{market['divine']['f'][-1]}; hourly {market['hourly']}")
