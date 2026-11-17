@@ -425,6 +425,11 @@ def attach_hourly(market, fx, nj):
         arr, src = (fx["s"].get(it["n"]), "fx")
         if not arr or sum(x is not None for x in arr) < 2:
             arr, src = nj["s"].get(it["n"]) or [], "nj"
+        elif it.get("p"):
+            # thin Faustus markets can sit far from the real price: trust them only if they agree with poe.ninja
+            last = [x for x in arr if x is not None][-1]
+            if abs(last / it["p"] - 1) > 0.30:
+                arr, src = nj["s"].get(it["n"]) or [], "nj"
         used[src] += 1
         out = {"src": src, "c1": pct(arr, 1), "c6": pct(arr, 6), "c24": pct(arr, 24), "sp": arr[-24:]}
         if src == "fx":
