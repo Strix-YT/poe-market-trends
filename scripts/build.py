@@ -258,7 +258,26 @@ def update_fx(prev, now, known=None, keep=HOURLY_KEEP_HOURS):
                 for k in ("s", "lo", "hi"):
                     out[k][n][i] = None
                 dropped += 1
-    print(f"faustus: dropped {dropped} thin item-hours")
+    # an hour far from its neighbours on below-normal volume is a misprint, not a move
+    for n in names:
+        S, V = out["s"][n], out["v"][n]
+        valid = [i for i, x in enumerate(S) if x is not None]
+        vols = sorted(V[i] or 0 for i in valid)
+        if len(valid) < 4 or not vols:
+            continue
+        med_v = vols[len(vols) // 2]
+        bad = []
+        for pos, i in enumerate(valid):
+            nb = [S[j] for j in valid[max(0, pos - 3):pos] + valid[pos + 1:pos + 4]]
+            nb.sort()
+            ref = nb[len(nb) // 2]
+            if ref and abs(S[i] / ref - 1) > 0.35 and (V[i] or 0) < med_v:
+                bad.append(i)
+        for i in bad:
+            for k in ("s", "lo", "hi"):
+                out[k][n][i] = None
+        dropped += len(bad)
+    print(f"faustus: dropped {dropped} thin or off-market item-hours")
     print(f"faustus: {fetched} hours fetched, {missing} unavailable, {len(times)} in window, {len(names)} items mapped")
     return out
 

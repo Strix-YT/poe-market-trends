@@ -327,7 +327,7 @@ footer details{margin-top:6px}
     const d = M.divine; const cur = (d.h || []).filter((x) => x != null).slice(-1)[0];
     const parts = [['DIVINE', cur, d.c24 ?? null]];
     ['Mirror of Kalandra', 'Exalted Orb', 'Mageblood [4 Flasks]', 'Headhunter'].forEach((n) => { const i = byN.get(n); if (i) parts.push([n.replace(' of Kalandra', '').replace(' [4 Flasks]', '').toUpperCase(), i.p, v24(i)]); });
-    const hi = M.items.filter((i) => i.conf === 'High' && i.c1 != null).sort((a, b) => Math.abs(b.c1) - Math.abs(a.c1))[0];
+    const hi = M.items.filter((i) => i.conf === 'High' && i.src === 'fx' && i.c1 != null).sort((a, b) => Math.abs(b.c1) - Math.abs(a.c1))[0];
     const t = $('#ticker'); t.replaceChildren(...parts.map(([n, p, c]) => el('span', {}, n + ' ', el('b', { text: fmtC(p) + 'c' }), ' ', el('span', { class: cls(c), text: c == null ? '' : (c >= 0 ? '▲' : '▼') + pct(Math.abs(c)).replace('+', '') }))));
     if (hi) t.append(el('span', {}, '1H MOVER ', el('b', { text: hi.n }), ' ', el('span', { class: cls(hi.c1), text: pct(hi.c1) })));
     const g = new Date(M.generatedAt); const mins = Math.round((Date.now() - g) / 60000);
