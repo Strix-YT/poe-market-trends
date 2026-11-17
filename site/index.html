@@ -316,11 +316,11 @@ footer details{margin-top:6px}
   on('#catNone', 'click', () => { S.cats = []; syncControls(); save(); render(); });
   on('#reset', 'click', () => { S = JSON.parse(JSON.stringify(DEFAULTS)); S.cats = [...new Set(M.items.map((i) => i.c))]; shown = 50; syncControls(); save(); render(); });
   on('#moreBtn', 'click', () => { shown += 100; renderTable(); });
-  on('thead th[data-k]', 'click', (e) => { const k = e.currentTarget.dataset.k; if (k === 'sp') return; if (S.sortK === k) S.sortDir = -S.sortDir; else { S.sortK = k; S.sortDir = ['n', 'c', 'sig'].includes(k) ? 1 : -1; } save(); renderTable(); });
+  on('thead th[data-k]', 'click', (e) => { const k = e.currentTarget.dataset.k; if (k === 'sp') return; if (S.sortK === k) S.sortDir = -S.sortDir; else { S.sortK = k; S.sortDir = ['n', 'c', 'sig'].includes(k) ? 1 : -1; } shown = 50; save(); render(); });
 
   // ---------------------------------------------------------------- derived
   const v24 = (i) => i.c24 ?? i.d1;
-  const val = (i, k) => k === 'c24' ? v24(i) : k === 'liq' ? (i.v ?? i.ls ?? -1) : i[k];
+  const val = (i, k) => k === 'c24' ? v24(i) : k === 'liq' ? (i.v ?? (i.ls != null ? i.ls * i.p : -1)) : i[k];
   function filtered() {
     const q = S.q.trim().toLowerCase(), pmin = parseFloat(S.pmin), pmax = parseFloat(S.pmax);
     return M.items.filter((i) => (S.market === 'all' || i.g === S.market) && S.cats.includes(i.c) && S.sig.includes(i.sig) && S.conf.includes(i.conf)
