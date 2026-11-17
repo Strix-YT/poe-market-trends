@@ -36,6 +36,8 @@ HOURLY_KEEP_HOURS = 48
 PHI = 0.55
 MIN_VOLUME = 50       # exchange items: chaos traded per day
 MIN_LISTINGS = 10     # uniques: listings on trade
+MIN_UNIQUE_PRICE = 5  # uniques at the chaos floor have no meaningful trend
+MAX_DAILY_MOVE = 0.6  # cap on daily log-momentum (about +82% / -45% per day)
 
 EXCHANGE_TYPES = {
     "Currency": "Currency", "Fragment": "Fragments", "Essence": "Essences", "Fossil": "Fossils",
@@ -96,7 +98,7 @@ def fetch_all():
             print(f"warn: {t}: {e}", file=sys.stderr)
             continue
         for l in j.get("lines") or []:
-            if (l.get("listingCount") or 0) < MIN_LISTINGS or not l.get("chaosValue"):
+            if (l.get("listingCount") or 0) < MIN_LISTINGS or (l.get("chaosValue") or 0) < MIN_UNIQUE_PRICE:
                 continue
             name = l["name"]
             if l.get("links"):
@@ -127,7 +129,7 @@ def momentum(vals):
     if not d:
         return None, d
     m = 0.75 * d[-1] + 0.25 * d[-2] if len(d) >= 2 else d[-1]
-    return m, d
+    return max(-MAX_DAILY_MOVE, min(MAX_DAILY_MOVE, m)), d
 
 
 def path(m):
@@ -140,6 +142,10 @@ def history_from_spark(price, spark):
     known = [i for i, v in enumerate(s) if v is not None]
     if not known:
         return [None] * 6 + [price]
+    # poe.ninja pads days before an item first traded with a flat 0% value; drop that repeated lead-in
+    while len(known) >= 2 and s[known[0]] == s[known[1]]:
+        s[known[0]] = None
+        known = known[1:]
     last = known[-1]
     return [price * (1 + v / 100) / (1 + s[last] / 100) if v is not None else None for v in s]
 
