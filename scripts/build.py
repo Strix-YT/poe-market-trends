@@ -56,6 +56,13 @@ FX = "https://web.poecdn.com/api/currency-exchange"
 CHAOS_ID = "Metadata/Items/Currency/CurrencyRerollRare"
 DIVINE_ID = "Metadata/Items/Currency/CurrencyModValues"
 ART_NAMES = {}   # poe.ninja art file name -> item names (filled while fetching)
+REPOE_URLS = [   # community game-data export: metadata id -> item name
+    "https://repoe-fork.github.io/base_items.min.json",
+    "https://repoe-fork.github.io/base_items.json",
+    "https://raw.githubusercontent.com/lvlvllvlvllvlvl/RePoE/master/RePoE/data/base_items.min.json",
+]
+META_NAMES = {}  # filled by load_meta_names()
+FX_VERSION = 2   # bump when the Faustus name mapping changes, to rebuild cached hours
 UA = "poe-market-trends (github.com/Strix-YT/poe-market-trends; hourly)"
 
 
@@ -174,14 +181,34 @@ def fx_prices(j):
     return out
 
 
+def load_meta_names():
+    """Metadata id -> name (and art file -> name) from RePoE; empty if unreachable."""
+    for url in REPOE_URLS:
+        try:
+            data = get(url, tries=2)
+        except Exception as e:
+            print(f"note: RePoE {url}: {e}", file=sys.stderr)
+            continue
+        for mid, b in data.items():
+            if b.get("name"):
+                META_NAMES[mid] = b["name"]
+                art = ((b.get("visual_identity") or {}).get("dds_file") or "").rsplit("/", 1)[-1].rsplit(".", 1)[0]
+                if art:
+                    META_NAMES.setdefault("art:" + art, b["name"])
+        print(f"RePoE: {len(META_NAMES)} names from {url}")
+        return
+
+
 def fx_name(meta_id):
     if meta_id == DIVINE_ID:
         return "Divine Orb"
+    if meta_id in META_NAMES:
+        return META_NAMES[meta_id]
     names = ART_NAMES.get(meta_id.rsplit("/", 1)[-1])
     return next(iter(names)) if names and len(names) == 1 else None
 
 
-def update_fx(prev, now, keep=HOURLY_KEEP_HOURS):
+def update_fx(prev, now, known=None, keep=HOURLY_KEEP_HOURS):
     """Rolling hourly Faustus series {t, s, v, lo, hi}; fills any missing hour in the window."""
     last = int(now.timestamp()) // 3600 * 3600 - 3600
     want = [last - 3600 * k for k in range(keep - 1, -1, -1)]
@@ -208,13 +235,13 @@ def update_fx(prev, now, keep=HOURLY_KEEP_HOURS):
         rec = {"s": {}, "v": {}, "lo": {}, "hi": {}}
         for mid, r in fx_prices(j).items():
             n = fx_name(mid)
-            if n:
+            if n and (known is None or n in known):
                 rec["s"][n], rec["v"][n] = r4(r["p"]), round(r["v"])
                 rec["lo"][n], rec["hi"][n] = r4(r["lo"]), r4(r["hi"])
         rows[t] = rec
         time.sleep(0.2)
     times = sorted(rows)
-    names = sorted({n for t in times for n in rows[t]["s"]})
+    names = sorted({n for t in times for n in rows[t]["s"] if known is None or n in known})
     out = {"t": times}
     for k in ("s", "v", "lo", "hi"):
         out[k] = {n: [rows[t][k].get(n) for t in times] for n in names}
@@ -404,12 +431,16 @@ if __name__ == "__main__":
     if os.environ.get("SKIP_FAUSTUS"):
         fx = prev.get("fx") or {"t": [], "s": {}, "v": {}, "lo": {}, "hi": {}}
     else:
-        fx = update_fx(prev.get("fx") or {}, now)
+        load_meta_names()
+        known = {it["n"] for it in market["items"]} | {"Divine Orb"}
+        # cached hours are reused only if they were built with the current name mapping
+        prev_fx = prev.get("fx") if prev.get("fxv") == FX_VERSION else {}
+        fx = update_fx(prev_fx or {}, now, known)
     attach_hourly(market, fx, nj)
     with open(f"{out_dir}/market.json", "w") as fh:
         json.dump(market, fh, separators=(",", ":"))
     with open(f"{out_dir}/hourly.json", "w") as fh:
-        json.dump({"generatedAt": market["generatedAt"], "nj": nj, "fx": fx}, fh, separators=(",", ":"))
+        json.dump({"generatedAt": market["generatedAt"], "fxv": FX_VERSION, "nj": nj, "fx": fx}, fh, separators=(",", ":"))
     c = Counter((it["g"], it["sig"]) for it in market["items"])
     print(f"{now:%Y-%m-%d %H:%M}Z {len(market['items'])} items {dict(c)}; divine {div['price']} -> "
           f"{market['divine']['f'][-1]}; hourly {market['hourly']}")
