@@ -30,6 +30,7 @@ jobs:
       - name: Fetch poe.ninja and build forecasts
         env:
           LEAGUE: Covens
+          PREV_HOURLY_URL: https://strix-yt.github.io/poe-market-trends/data/hourly.json
         run: python scripts/build.py site/data
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

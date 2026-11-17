@@ -290,7 +290,10 @@ document.querySelectorAll('#pc-refresh').forEach((b) => b.addEventListener('clic
   const msg = document.getElementById('pc-refresh-msg'); if (msg) msg.textContent = '';
   await dash.reload();
   b.disabled = false; b.textContent = '↻ Refresh now';
-  if (msg) { msg.textContent = dash.meta.generatedAt !== before ? 'Updated to the latest prices.' : 'Already up to date. New prices are pulled from poe.ninja every hour.'; setTimeout(() => { msg.textContent = ''; }, 6000); }
+  if (msg) { const ageMin = dash.meta.generatedAt ? (Date.now() - new Date(dash.meta.generatedAt)) / 60000 : null;
+    msg.textContent = dash.meta.generatedAt !== before ? 'Updated to the latest prices.'
+      : (ageMin != null && ageMin > 90) ? `Already showing the newest data, but it is ${Math.round(ageMin / 60)}h old: the hourly update is running late.`
+      : 'Already up to date. New prices are pulled from poe.ninja every hour.'; setTimeout(() => { msg.textContent = ''; }, 9000); }
 }));
 pc.textDraw('stamp', () => dash.meta.generatedAt ? 'data refreshed ' + d3.utcFormat('%-d %b, %H:%M UTC')(new Date(dash.meta.generatedAt)) : null);
 pc.textDraw('asOf', () => { const v = one('divine', (r) => r.point === 'now', 'date'); return v ? d3.utcFormat('%-d %b %Y')(pc.parse(v)) : null; });
