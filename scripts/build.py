@@ -124,7 +124,8 @@ def fetch_all():
             spark = (l.get("sparkLine") or {}).get("data") or []
             if not any(x is not None for x in spark):
                 spark = (l.get("lowConfidenceSparkLine") or {}).get("data") or []
-            recs.append(dict(group="Uniques", cat=label, name=name, sub=l.get("itemType") or l.get("baseType") or "",
+            recs.append(dict(group="Uniques", cat=label, name=name, base=l.get("baseType") or "", uname=l["name"],
+                             sub=l.get("itemType") or l.get("baseType") or "",
                              links=l.get("links") or 0, price=float(l["chaosValue"]), volume=None,
                              listings=int(l.get("listingCount") or 0), spark=spark))
         time.sleep(0.5)
@@ -365,6 +366,7 @@ def build(recs, now):
             trend, sig, fpath = "New", "New", [None] * 7
         items.append({
             "n": r["name"], "g": r["group"], "c": r["cat"], "s": r["sub"], "l": r["links"],
+            **({"un": r.get("uname"), "b": r.get("base")} if r["group"] == "Uniques" else {}),
             "p": r4(r["price"]), "dv": r4(r["price"] / dh[-1]),
             "v": None if r["volume"] is None else round(r["volume"]),
             "ls": r["listings"],

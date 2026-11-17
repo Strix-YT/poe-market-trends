@@ -77,8 +77,9 @@ tbody tr{border-top:1px solid #1d2128;cursor:pointer}
 tbody tr:hover{background:#151a20}
 tbody td{padding:8px 12px;text-align:right;white-space:nowrap}
 tbody td:first-child,tbody td:nth-child(2){text-align:left}
-td.nm{font-weight:500;max-width:280px;overflow:hidden;text-overflow:ellipsis}
+td.nm{font-weight:500;max-width:340px;overflow:hidden;text-overflow:ellipsis}
 td.nm small{display:block;color:var(--dim);font-weight:400;font-size:11px}
+.trade{font-size:11px;font-weight:600;color:var(--accent);text-decoration:none;border:1px solid #4a3d22;border-radius:4px;padding:1px 6px;margin-left:8px;white-space:nowrap}.trade:hover{background:#2a2316;color:var(--accent2)}
 .sig{font-size:11px;border:1px solid currentColor;border-radius:4px;padding:1px 6px}
 .more{display:flex;justify-content:center;padding:6px}
 
@@ -240,6 +241,19 @@ footer details{margin-top:6px}
   const short = (v) => v == null ? '—' : v >= 1e6 ? d3.format('.3~s')(v).replace('M', 'M') : v >= 1e3 ? d3.format('.3~s')(v) : d3.format(',')(Math.round(v));
   const el = (tag, attrs = {}, ...kids) => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'class') e.className = v; else if (k === 'text') e.textContent = v; else if (k.startsWith('on')) e.addEventListener(k.slice(2), v); else if (v != null) e.setAttribute(k, v); } kids.flat().forEach((k) => k != null && e.append(k)); return e; };
 
+  // official trade-site search for a unique: online sellers, same base type, same link count
+  function tradeUrl(i) {
+    if (i.g !== 'Uniques' || !M) return null;
+    const name = i.un || i.n.replace(/ \(\dL\)/, '').replace(/ \[.*\]$/, '').replace(/ #\d+$/, '');
+    const query = { status: { option: 'online' }, name };
+    if (i.b) query.type = i.b;
+    if (i.l) query.filters = { socket_filters: { filters: { links: { min: i.l, max: i.l } } } };
+    return `https://www.pathofexile.com/trade/search/${encodeURIComponent(M.league || 'Standard')}?q=${encodeURIComponent(JSON.stringify({ query }))}`;
+  }
+  const tradeLink = (i, label = 'Trade ↗') => { const u = tradeUrl(i); if (!u) return null;
+    const a = el('a', { class: 'trade', href: u, target: '_blank', rel: 'noopener noreferrer', title: `Search ${i.n} on the official trade site`, text: label });
+    a.addEventListener('click', (e) => e.stopPropagation()); a.addEventListener('keydown', (e) => e.stopPropagation()); return a; };
+
   // ---------------------------------------------------------------- state
   const DEFAULTS = { q: '', market: 'all', cats: null, sub: '', links: '', pmin: '', pmax: '', sig: ['Gain', 'Hold', 'Lose', 'New'], conf: ['High', 'Medium'], fxOnly: false, period: 'c1', dir: 'abs', sortK: null, sortDir: -1 };
   let S = JSON.parse(JSON.stringify(DEFAULTS));
@@ -363,7 +377,7 @@ footer details{margin-top:6px}
       const liq = i.v != null ? short(i.v) + 'c/day' : i.ls != null ? i.ls + ' listed' : '—';
       const sc = i.sig === 'Gain' ? 'up' : i.sig === 'Lose' ? 'dn' : 'mut';
       const tr = el('tr', { tabindex: '0', title: 'Open details' },
-        el('td', { class: 'nm' }, i.n, sub ? el('small', { text: sub }) : null),
+        el('td', { class: 'nm' }, i.n, tradeLink(i), sub ? el('small', { text: sub }) : null),
         el('td', { class: 'mut', text: i.c }),
         el('td', { class: 'mono', text: fmtC(i.p) + 'c' }),
         el('td', { class: 'mono ' + cls(i.c1), text: pct(i.c1) }),
@@ -464,7 +478,8 @@ footer details{margin-top:6px}
     const d = el('div', { class: 'drawer', role: 'dialog', 'aria-modal': 'true', 'aria-label': i.n + ' details' },
       closeBtn,
       el('div', {}, el('div', { class: 'mut', style: 'font-size:12px', text: [i.c, i.s, i.l ? i.l + '-link' : null].filter(Boolean).join(' · ') }), el('h2', { text: i.n }),
-        el('div', { class: 'mono', style: 'font-size:28px;margin-top:4px' }, fmtC(i.p) + 'c ', el('span', { class: 'mut', style: 'font-size:14px', text: `≈ ${fmtC(i.dv)} div` }))),
+        el('div', { class: 'mono', style: 'font-size:28px;margin-top:4px' }, fmtC(i.p) + 'c ', el('span', { class: 'mut', style: 'font-size:14px', text: `≈ ${fmtC(i.dv)} div` })),
+        i.g === 'Uniques' ? el('div', { style: 'margin-top:10px' }, tradeLink(i, 'Search on official trade ↗')) : null),
       el('div', { class: 'stats' }, stat('1h', pct(i.c1), cls(i.c1)), stat('6h', pct(i.c6), cls(i.c6)), stat('24h', pct(v24(i)), cls(v24(i))),
         stat('Since first traded', pct(i.chg), cls(i.chg)), stat('7-day forecast', pct(i.f7), cls(i.f7)), stat('Signal', `${i.sig} · ${i.conf}`, 't'),
         stat('Momentum', i.tr, 't'), stat('Liquidity', i.v != null ? short(i.v) + 'c/day' : i.ls != null ? i.ls + ' listed' : '—'),
