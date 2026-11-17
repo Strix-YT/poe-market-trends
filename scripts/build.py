@@ -62,6 +62,7 @@ REPOE_URLS = [   # community game-data export: metadata id -> item name
     "https://raw.githubusercontent.com/lvlvllvlvllvlvl/RePoE/master/RePoE/data/base_items.min.json",
 ]
 META_NAMES = {}  # filled by load_meta_names()
+MIN_FX_HOUR_VOLUME = 20  # chaos; below this an hourly Faustus price is ignored
 FX_VERSION = 2   # bump when the Faustus name mapping changes, to rebuild cached hours
 UA = "poe-market-trends (github.com/Strix-YT/poe-market-trends; hourly)"
 
@@ -245,6 +246,19 @@ def update_fx(prev, now, known=None, keep=HOURLY_KEEP_HOURS):
     out = {"t": times}
     for k in ("s", "v", "lo", "hi"):
         out[k] = {n: [rows[t][k].get(n) for t in times] for n in names}
+    # a lone tiny trade can print an absurd rate: drop hours with negligible volume for that item
+    dropped = 0
+    for n in names:
+        vols = [x for x in out["v"][n] if x]
+        if not vols:
+            continue
+        floor = max(MIN_FX_HOUR_VOLUME, 0.05 * sorted(vols)[len(vols) // 2])
+        for i, x in enumerate(out["v"][n]):
+            if out["s"][n][i] is not None and (x or 0) < floor:
+                for k in ("s", "lo", "hi"):
+                    out[k][n][i] = None
+                dropped += 1
+    print(f"faustus: dropped {dropped} thin item-hours")
     print(f"faustus: {fetched} hours fetched, {missing} unavailable, {len(times)} in window, {len(names)} items mapped")
     return out
 
