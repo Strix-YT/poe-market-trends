@@ -79,7 +79,7 @@ tbody td{padding:8px 12px;text-align:right;white-space:nowrap}
 tbody td:first-child,tbody td:nth-child(2){text-align:left}
 td.nm{font-weight:500;max-width:340px;overflow:hidden;text-overflow:ellipsis}
 td.nm small{display:block;color:var(--dim);font-weight:400;font-size:11px}
-.trade{font-size:11px;font-weight:600;color:var(--accent);text-decoration:none;border:1px solid #4a3d22;border-radius:4px;padding:1px 6px;margin-left:8px;white-space:nowrap}.trade:hover{background:#2a2316;color:var(--accent2)}
+.trade{display:inline-block;font-size:11px;font-weight:600;color:var(--accent);text-decoration:none;border:1px solid #4a3d22;border-radius:4px;padding:3px 8px;white-space:nowrap}.trade:hover{background:#2a2316;color:var(--accent2)}
 .sig{font-size:11px;border:1px solid currentColor;border-radius:4px;padding:1px 6px}
 .more{display:flex;justify-content:center;padding:6px}
 
@@ -208,9 +208,9 @@ footer details{margin-top:6px}
         <thead><tr>
           <th data-k="n">Item</th><th data-k="c">Type</th><th data-k="p">Price</th><th data-k="c1">1h</th>
           <th data-k="sp" style="cursor:default;text-align:center">Last 24h</th><th data-k="c24">24h</th>
-          <th data-k="f7">7d fcst</th><th data-k="sig">Signal</th><th data-k="liq">Liquidity</th>
+          <th data-k="f7">7d fcst</th><th data-k="sig">Signal</th><th data-k="liq">Liquidity</th><th style="cursor:default;text-align:center">Trade</th>
         </tr></thead>
-        <tbody id="tbody"><tr><td colspan="9" class="empty">Loading…</td></tr></tbody>
+        <tbody id="tbody"><tr><td colspan="10" class="empty">Loading…</td></tr></tbody>
       </table>
     </div>
     <div class="more"><button class="btn2" type="button" id="moreBtn" hidden>Show more</button></div>
@@ -371,13 +371,13 @@ footer details{margin-top:6px}
     $$('thead th[data-k]').forEach((th) => th.setAttribute('aria-sort', S.sortK === th.dataset.k ? (S.sortDir < 0 ? 'descending' : 'ascending') : (!S.sortK && th.dataset.k === S.period ? 'descending' : 'none')));
     const rows = ROWS; const tb = $('#tbody');
     $('#count').textContent = `${d3.format(',')(rows.length)} of ${d3.format(',')(M.items.length)} items`;
-    if (!rows.length) { tb.replaceChildren(el('tr', {}, el('td', { colspan: 9, class: 'empty', text: 'No items match these filters.' }))); $('#moreBtn').hidden = true; return; }
+    if (!rows.length) { tb.replaceChildren(el('tr', {}, el('td', { colspan: 10, class: 'empty', text: 'No items match these filters.' }))); $('#moreBtn').hidden = true; return; }
     tb.replaceChildren(...rows.slice(0, shown).map((i) => {
       const sub = i.g === 'Uniques' ? [i.s, i.l ? i.l + 'L' : null].filter(Boolean).join(' · ') : (i.src === 'fx' ? 'Faustus hourly' : '');
       const liq = i.v != null ? short(i.v) + 'c/day' : i.ls != null ? i.ls + ' listed' : '—';
       const sc = i.sig === 'Gain' ? 'up' : i.sig === 'Lose' ? 'dn' : 'mut';
       const tr = el('tr', { tabindex: '0', title: 'Open details' },
-        el('td', { class: 'nm' }, i.n, tradeLink(i), sub ? el('small', { text: sub }) : null),
+        el('td', { class: 'nm' }, i.n, sub ? el('small', { text: sub }) : null),
         el('td', { class: 'mut', text: i.c }),
         el('td', { class: 'mono', text: fmtC(i.p) + 'c' }),
         el('td', { class: 'mono ' + cls(i.c1), text: pct(i.c1) }),
@@ -385,7 +385,8 @@ footer details{margin-top:6px}
         el('td', { class: 'mono ' + cls(v24(i)), text: pct(v24(i)) }),
         el('td', { class: 'mono ' + cls(i.f7), style: 'font-weight:600', text: pct(i.f7) }),
         el('td', {}, el('span', { class: 'sig ' + sc, text: i.sig })),
-        el('td', { class: 'mut', text: liq }));
+        el('td', { class: 'mut', text: liq }),
+        el('td', { style: 'text-align:center' }, tradeLink(i) || el('span', { class: 'dim', text: '—', title: 'Bulk items trade on Faustus' })));
       tr.addEventListener('click', () => openDrawer(i));
       tr.addEventListener('keydown', (e) => { if (e.key === 'Enter') openDrawer(i); });
       return tr;
@@ -506,7 +507,7 @@ footer details{margin-top:6px}
   let rw = window.innerWidth; window.addEventListener('resize', () => { if (Math.abs(window.innerWidth - rw) > 40) { rw = window.innerWidth; drawDivine(); } });
 
   if (window.matchMedia('(max-width: 900px)').matches) $('#fbox').removeAttribute('open');
-  load(true).catch(() => { $('#tbody').replaceChildren(el('tr', {}, el('td', { colspan: 9, class: 'empty', text: 'Could not load market data.' }))); });
+  load(true).catch(() => { $('#tbody').replaceChildren(el('tr', {}, el('td', { colspan: 10, class: 'empty', text: 'Could not load market data.' }))); });
 })();
 </script>
 </body>
