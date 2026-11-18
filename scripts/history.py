@@ -39,6 +39,10 @@ MIN_CHAOS = 5          # ignore values at the chaos floor
 BAD_LEAGUE_WORDS = ("hardcore", "hc ", "standard", "ruthless", "ssf", "solo")
 TYPES = {}            # item name -> category
 GRID = [0, 0.25, 0.5, 0.75, 1.0]
+GRID_M = [-0.75, -0.5, -0.25, 0, 0.25, 0.5, 1.0]   # negative = expect big moves to pull back
+GRID_H = [0, 0.5, 1.0]
+GRID_C = [0, 0.5, 1.0, 1.5]
+MIN_CALL_SHARE = 0.03   # a usable model must flag at least 3% of item-days as Gain and as Lose
 SAMPLE = 400_000      # backtest rows used for the weight search
 
 
@@ -266,15 +270,30 @@ def main(out_file):
                 "n": len(rows)}
 
     results = []
-    for wm in GRID:
-        for wh in GRID:
-            for wc in GRID:
+    for wm in GRID_M:
+        for wh in GRID_H:
+            for wc in GRID_C:
                 results.append(((wm, wh, wc), score((wm, wh, wc), rows)))
     named = {"noChange": (0, 0, 0), "momentumOnly": (1, 0, 0), "itemHistoryOnly": (0, 1, 0), "categoryHistoryOnly": (0, 0, 1)}
     table = {k: next(r[1] for r in results if r[0] == w) for k, w in named.items()}
-    # best = lowest typical error among blends that still make calls in both directions
-    usable = [r for r in results if r[0] != (0, 0, 0) and r[1]["gainCalls"] and r[1]["loseCalls"]]
-    best = min(usable, key=lambda r: r[1]["medianAbsErrPct"])
+
+    def call_precision(r):
+        s = r[1]
+        n = s["gainCalls"] + s["loseCalls"]
+        return ((s["gainRightPct"] or 0) * s["gainCalls"] + (s["loseRightPct"] or 0) * s["loseCalls"]) / n if n else 0
+
+    # best = the blend whose Gain/Lose calls come true most often, among blends that make a fair number of
+    # calls in both directions and don't miss by more than "no change" does
+    floor = MIN_CALL_SHARE * len(rows)
+    base_err = table["noChange"]["medianAbsErrPct"]
+    usable = [r for r in results if r[1]["gainCalls"] >= floor and r[1]["loseCalls"] >= floor
+              and r[1]["medianAbsErrPct"] <= base_err + 1.0]
+    if not usable:
+        usable = [r for r in results if r[0] != (0, 0, 0)]
+    best = max(usable, key=lambda r: (round(call_precision(r), 1), -r[1]["medianAbsErrPct"]))
+    best[1]["callRightPct"] = round(call_precision(best), 1)
+    for k in table:
+        table[k]["callRightPct"] = round(call_precision((None, table[k])), 1)
     table["best"] = best[1]
     for k, v in table.items():
         log(f"{k:20s} {v}")
