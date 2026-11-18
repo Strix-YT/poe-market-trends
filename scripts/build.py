@@ -390,6 +390,8 @@ def build(recs, now):
     div_prior = prior_at(priors["divine"]["g"], league_day) if priors else None
     div_path = blend_path(path(dm), [dw["momentum"], (dw["prior"], div_prior)])
     div_fc = [dh[-1] * math.exp(x) for x in div_path]
+    div_trend = [dh[-1] * math.exp(x) for x in path(dm)]
+    div_hist = [dh[-1] * math.exp((div_prior or 0.0) * (k + 1) / 7) for k in range(7)] if div_prior is not None else div_trend
 
     items = []
     for r in recs:
@@ -404,6 +406,10 @@ def build(recs, now):
             c = prior_at(pcats[ct]["g"], league_day) if ct in pcats else None
             fc = blend_path(path(m), [w["momentum"], (w["item"], h), (w["category"], c)])
             f7 = math.exp(fc[-1]) - 1
+            trend_path = path(m)                                   # current trend only
+            hist = h if (pr and pr.get("n", 0) >= 2 and h is not None) else c
+            hist_src = "item" if hist is h and h is not None else ("category" if c is not None else None)
+            hist_path = None if hist is None else [hist * (k + 1) / 7 for k in range(7)]
             total = pts[-1][1] / pts[0][1] - 1
             d1 = math.exp(d[-1]) - 1
             if len(d) >= 2:
@@ -414,13 +420,22 @@ def build(recs, now):
                 trend = "New"
             sig = "Gain" if f7 > 0.10 else "Lose" if f7 < -0.10 else "Hold"
             fpath = [r4(pts[-1][1] * math.exp(fc[k]) * div_fc[k]) for k in range(7)]
+            tpath = [r4(pts[-1][1] * math.exp(trend_path[k]) * div_trend[k]) for k in range(7)]
+            hpath = None if hist_path is None else [r4(pts[-1][1] * math.exp(hist_path[k]) * div_hist[k]) for k in range(7)]
+            ft = round((math.exp(trend_path[-1]) - 1) * 100, 1)
+            fh = None if hist is None else round((math.exp(hist) - 1) * 100, 1)
         else:
             f7 = total = d1 = None
             trend, sig, fpath = "New", "New", [None] * 7
+            tpath = hpath = None
+            ft = None
             pr = pitems.get(r["name"])
             h = prior_at(pr["g"], league_day) if pr else None
             ct = (pr or {}).get("t") or DUMP_TYPE.get(r["cat"])
             c = prior_at(pcats[ct]["g"], league_day) if ct in pcats else None
+            hist = h if (pr and pr.get("n", 0) >= 2 and h is not None) else c
+            hist_src = "item" if hist is h and h is not None else ("category" if c is not None else None)
+            fh = None if hist is None else round((math.exp(hist) - 1) * 100, 1)
         items.append({
             "n": r["name"], "g": r["group"], "c": r["cat"], "s": r["sub"], "l": r["links"],
             **({"un": r.get("uname"), "b": r.get("base")} if r["group"] == "Uniques" else {}),
@@ -435,11 +450,13 @@ def build(recs, now):
             "hp": None if h is None else round((math.exp(h) - 1) * 100, 1),
             "hn": pitems[r["name"]]["n"] if h is not None else 0,
             "cp": None if c is None else round((math.exp(c) - 1) * 100, 1),
+            "ft": ft, "fh": fh, "fhs": hist_src, "tp": tpath, "hpth": hpath,
         })
     market = {
         "generatedAt": now.isoformat(timespec="seconds"), "league": LEAGUE,
         "days": days, "fdays": fdays,
-        "divine": {"h": [r4(x) for x in dh], "f": [r4(x) for x in div_fc]},
+        "divine": {"h": [r4(x) for x in dh], "f": [r4(x) for x in div_fc], "ft": [r4(x) for x in div_trend],
+                   "fh": None if div_prior is None else [r4(x) for x in div_hist]},
         "items": items,
         "model": "Prices converted to Divines; 7-day damped momentum (0.75*last + 0.25*previous daily log-change, "
                  f"damped by {PHI}/day), blended with the median move of the same item at the same league day in "

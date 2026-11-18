@@ -202,7 +202,8 @@ footer details{margin-top:6px}
         <button type="button" data-v="c1" aria-pressed="true">1h</button>
         <button type="button" data-v="c6" aria-pressed="false">6h</button>
         <button type="button" data-v="c24" aria-pressed="false">24h</button>
-        <button type="button" data-v="f7" aria-pressed="false">7d fcst</button>
+        <button type="button" data-v="ft" aria-pressed="false">7d trend</button>
+        <button type="button" data-v="fh" aria-pressed="false">7d past leagues</button>
       </div>
       <div class="seg" id="dir" role="group" aria-label="Direction">
         <button type="button" data-v="abs" aria-pressed="true">Biggest</button>
@@ -217,9 +218,9 @@ footer details{margin-top:6px}
         <thead><tr>
           <th data-k="n">Item</th><th data-k="c">Type</th><th data-k="p" title="Chaos below 1 Divine, Divines above">Price</th><th data-k="c1">1h</th>
           <th data-k="sp" style="cursor:default;text-align:center">Last 24h</th><th data-k="c24">24h</th>
-          <th data-k="f7">7d fcst</th><th data-k="sig">Signal</th><th data-k="liq">Liquidity</th><th style="cursor:default;text-align:center">Trade</th>
+          <th data-k="ft" title="If the current trend simply continues (momentum only)">7d trend</th><th data-k="fh" title="What this item did over the next 7 days at this point in past leagues (or its category, marked c)">7d past leagues</th><th data-k="sig" title="Backtested call: weighs both by what came true most often when replaying past leagues">Call</th><th data-k="liq">Liquidity</th><th style="cursor:default;text-align:center">Trade</th>
         </tr></thead>
-        <tbody id="tbody"><tr><td colspan="10" class="empty">Loading…</td></tr></tbody>
+        <tbody id="tbody"><tr><td colspan="11" class="empty">Loading…</td></tr></tbody>
       </table>
     </div>
     <div class="more"><button class="btn2" type="button" id="moreBtn" hidden>Show more</button></div>
@@ -232,7 +233,7 @@ footer details{margin-top:6px}
   <details>
     <summary>How the numbers work</summary>
     <p><b>Hourly (1h, 6h, 24h):</b> for currency-exchange items, each hour's price is the volume-weighted average rate on Faustus for the last completed hour (GGG publishes each hour once it ends, so the newest point is up to an hour old). Uniques and cards aren't traded on Faustus, so their hourly moves come from hourly poe.ninja snapshots. Where hourly history is too short, 24h falls back to poe.ninja's daily change.</p>
-    <p><b>7-day forecast:</b> prices are converted to Divines. The forecast combines two things learned from past leagues: big recent moves tend to partly pull back, and each category tends to move a certain way at a given point in a league. The weights were picked by replaying the last five leagues day by day (<span id="btLeagues">—</span>). <span id="btNote"></span> Gain or Lose means a projected move beyond ±10% in Divines. Confidence follows liquidity: currency by Chaos traded per day (High ≥ 20,000c, Medium ≥ 3,000c), Uniques by trade listings (High ≥ 100, Medium ≥ 25).</p>
+    <p><b>Two 7-day predictions</b>, both measured against the Divine Orb. <b>7d trend</b> assumes the current momentum continues: 75% of the last day's change plus 25% of the day before, fading 45% a day. <b>7d past leagues</b> is what the same item did over the next 7 days at this point in past leagues (median across leagues), or its category when the item has too little history (marked <sup>c</sup>). <b>Call</b> (Gain / Hold / Lose) blends the two in the way that came true most often when replaying the last five leagues day by day (<span id="btLeagues">—</span>): it expects big recent moves to partly pull back and adds half the category's usual move. <span id="btNote"></span> Gain or Lose means a projected move beyond ±10%. Confidence follows liquidity: currency by Chaos traded per day (High ≥ 20,000c, Medium ≥ 3,000c), Uniques by trade listings (High ≥ 100, Medium ≥ 25).</p>
     <p>This is a short-term momentum read, not trading advice. Patches, new strategies and meta shifts move prices in ways no trend line can see.</p>
   </details>
 </footer>
@@ -367,7 +368,7 @@ footer details{margin-top:6px}
     const P = M.priors; if (!P) return;
     const b = P.backtest.items, best = b.best, mom = b.momentumOnly;
     const lg = $('#btLeagues'); if (lg) lg.textContent = P.leagues.join(', ');
-    const n = $('#btNote'); if (n) n.textContent = `In that replay its Gain calls came true ${best.gainRightPct}% of the time and its Lose calls ${best.loseRightPct}% (a plain momentum forecast managed ${mom.gainRightPct}% and ${mom.loseRightPct}%). Covens is on day ${M.leagueDay}.`;
+    const n = $('#btNote'), ih = b.itemHistoryOnly; if (n) n.textContent = `In that replay the Call's Gain calls came true ${best.gainRightPct}% of the time and its Lose calls ${best.loseRightPct}%. The trend alone managed ${mom.gainRightPct}% and ${mom.loseRightPct}%, and past leagues alone ${ih.gainRightPct}% and ${ih.loseRightPct}%. Covens is on day ${M.leagueDay}.`;
   }
   function renderKpis() {
     const d = M.divine; const cur = (d.h || []).filter((x) => x != null).slice(-1)[0];
@@ -375,10 +376,10 @@ footer details{margin-top:6px}
     const mir = M.items.find((i) => i.n === 'Mirror of Kalandra');
     const k = (label, value, sub, subCls) => el('div', { class: 'kpi' }, el('div', { class: 'k', text: label }), el('div', { class: 'v', text: value }), el('div', { class: 's' + (subCls ? ' ' + subCls : ''), text: sub }));
     $('#kpis').replaceChildren(
-      k('Divine Orb', fmtC(cur) + 'c', `1h ${pct(d.c1)} · 24h ${pct(d.c24)} · 7d → ${fmtC(d.f[6])}c`),
+      k('Divine Orb', fmtC(cur) + 'c', `1h ${pct(d.c1)} · 24h ${pct(d.c24)} · in 7d: ${fmtC((d.ft || d.f)[6])}c by trend${d.fh ? `, ${fmtC(d.fh[6])}c like past leagues` : ''}`),
       k('Forecast gainers', d3.format(',')(gain), `of ${d3.format(',')(rows.length)} items in view`, 'up'),
       k('Forecast losers', d3.format(',')(lose), `of ${d3.format(',')(rows.length)} items in view`, 'dn'),
-      mir ? k('Mirror of Kalandra', fmtP(mir.p), `${altP(mir.p)} · 7d ${pct(mir.f7)}`) : k('Items tracked', d3.format(',')(M.items.length), 'across all markets'));
+      mir ? k('Mirror of Kalandra', fmtP(mir.p), `${altP(mir.p)} · 7d trend ${pct(mir.ft)}`) : k('Items tracked', d3.format(',')(M.items.length), 'across all markets'));
   }
   function spark(arr, w = 72, h = 22) {
     const pts = (arr || []).map((v, i) => [i, v]).filter((p) => p[1] != null);
@@ -393,7 +394,7 @@ footer details{margin-top:6px}
     $$('thead th[data-k]').forEach((th) => th.setAttribute('aria-sort', S.sortK === th.dataset.k ? (S.sortDir < 0 ? 'descending' : 'ascending') : (!S.sortK && th.dataset.k === S.period ? 'descending' : 'none')));
     const rows = ROWS; const tb = $('#tbody');
     $('#count').textContent = `${d3.format(',')(rows.length)} of ${d3.format(',')(M.items.length)} items`;
-    if (!rows.length) { tb.replaceChildren(el('tr', {}, el('td', { colspan: 10, class: 'empty', text: 'No items match these filters.' }))); $('#moreBtn').hidden = true; return; }
+    if (!rows.length) { tb.replaceChildren(el('tr', {}, el('td', { colspan: 11, class: 'empty', text: 'No items match these filters.' }))); $('#moreBtn').hidden = true; return; }
     tb.replaceChildren(...rows.slice(0, shown).map((i) => {
       const sub = i.g === 'Uniques' ? [i.s, i.l ? i.l + 'L' : null].filter(Boolean).join(' · ') : (i.src === 'fx' ? 'Faustus hourly' : '');
       const liq = i.v != null ? short(i.v) + 'c/day' : i.ls != null ? i.ls + ' listed' : '—';
@@ -405,7 +406,8 @@ footer details{margin-top:6px}
         el('td', { class: 'mono ' + cls(i.c1), text: pct(i.c1) }),
         el('td', { style: 'text-align:center;padding:4px 12px' }, spark(i.sp)),
         el('td', { class: 'mono ' + cls(v24(i)), text: pct(v24(i)) }),
-        el('td', { class: 'mono ' + cls(i.f7), style: 'font-weight:600', text: pct(i.f7) }),
+        el('td', { class: 'mono ' + cls(i.ft), style: 'font-weight:600', text: pct(i.ft) }),
+        el('td', { class: 'mono ' + cls(i.fh), title: i.fhs === 'category' ? `Based on ${i.c} in past leagues (this item has too little history)` : i.fhs === 'item' ? 'Based on this item in past leagues' : 'No past-league data' }, pct(i.fh), i.fhs === 'category' ? el('sup', { class: 'dim', text: ' c' }) : null),
         el('td', {}, el('span', { class: 'sig ' + sc, text: i.sig })),
         el('td', { class: 'mut', text: liq }),
         el('td', { style: 'text-align:center' }, tradeLink(i) || el('span', { class: 'dim', text: '—', title: 'Bulk items trade on Faustus' })));
@@ -417,12 +419,12 @@ footer details{margin-top:6px}
     $('#moreBtn').textContent = `Show more (${d3.format(',')(rows.length - shown)} left)`;
   }
   function renderHeat() {
-    const k = S.period, lab = { c1: '1h', c6: '6h', c24: '24h', f7: '7-day forecast' }[k];
+    const k = S.period, lab = { c1: '1h', c6: '6h', c24: '24h', ft: '7-day trend', fh: '7-day past leagues' }[k];
     $('#heatLab').textContent = lab;
     const groups = d3.rollups(M.items.filter((i) => S.conf.includes(i.conf)), (v) => ({ med: d3.median(v, (i) => val(i, k)), n: v.length }), (i) => i.c)
       .filter(([, g]) => g.med != null).sort((a, b) => b[1].med - a[1].med);
     const col = d3.scaleLinear().domain([-30, -5, 0, 5, 30]).range([DN, '#f3a8ae', '#8b93a1', '#a9e5c3', UP]).clamp(true);
-    const ks = k === 'f7' ? 1 : k === 'c24' ? 1 : 4;
+    const ks = k === 'c1' || k === 'c6' ? 4 : 1;
     $('#heat').replaceChildren(...groups.map(([c, g]) => el('button', { type: 'button', style: `background:${col(g.med * ks)}`, title: `${c}: median ${pct(g.med)} (${g.n} items)`, onclick: () => { S.cats = [c]; S.market = c.startsWith('Unique') ? 'Uniques' : 'all'; shown = 50; syncControls(); save(); render(); } }, c, el('span', { text: pct(g.med) }))));
   }
 
@@ -457,13 +459,23 @@ footer details{margin-top:6px}
         const tw2 = tip.node().offsetWidth, sx = x(d.t) / W * host.clientWidth; tip.style('left', Math.max(0, Math.min(host.clientWidth - tw2, sx - tw2 / 2)) + 'px').style('top', '0px'); })
       .on('pointerleave', () => { tip.style('display', 'none'); dot.style('display', 'none'); });
   }
+  function callNote(i) {
+    if (i.ft == null || i.fh == null || !i.sig || i.sig === 'New') return null;
+    const up = (v) => v > 10, dn = (v) => v < -10;
+    let msg = null;
+    if (i.sig === 'Lose' && (up(i.ft) || up(i.fh))) msg = 'Why the call is Lose: when replaying past leagues, items that had just run up this much usually gave some of it back within a week.';
+    else if (i.sig === 'Gain' && (dn(i.ft) || dn(i.fh))) msg = 'Why the call is Gain: when replaying past leagues, items that had just dropped this much usually bounced back a bit within a week.';
+    else if (i.sig === 'Hold' && (Math.abs(i.ft) > 10 || Math.abs(i.fh) > 10)) msg = 'Why the call is Hold: the trend and past leagues point different ways, or past moves like this one tended to fade.';
+    return msg ? el('p', { class: 'mut', style: 'font-size:12px;margin:0;line-height:1.5', text: msg }) : null;
+  }
   function dailyChart(host, item) {
     host.replaceChildren();
     const days = M.days.map((d) => d3.utcParse('%Y-%m-%d')(d)), fdays = M.fdays.map((d) => d3.utcParse('%Y-%m-%d')(d));
     const act = item.h.map((p, k) => ({ t: days[k], p })).filter((d) => d.p != null);
     if (act.length < 1) return;
-    const fc = [act[act.length - 1], ...item.f.map((p, k) => ({ t: fdays[k], p })).filter((d) => d.p != null)];
-    const all = [...act, ...fc]; const W = Math.max(280, host.clientWidth), Hh = 170, m = { t: 8, r: 10, b: 24, l: 10 };
+    const mk = (arr) => arr ? [act[act.length - 1], ...arr.map((p, k) => ({ t: fdays[k], p })).filter((d) => d.p != null)] : null;
+    const fc = mk(item.tp || item.f), fh = mk(item.hpth);
+    const all = [...act, ...fc, ...(fh || [])]; const W = Math.max(280, host.clientWidth), Hh = 170, m = { t: 8, r: 10, b: 24, l: 10 };
     const svg = d3.select(host).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${Hh}`).attr('role', 'img').attr('aria-label', 'Daily price and 7-day forecast');
     const y = d3.scaleLinear().domain([0, d3.max(all, (d) => d.p) * 1.05]).nice(4);
     const probe = svg.append('text').attr('class', 'tick').append('tspan').text(fmtC(y.domain()[1])); m.l = Math.ceil(probe.node().getComputedTextLength()) + 12; probe.node().parentNode.remove();
@@ -474,6 +486,7 @@ footer details{margin-top:6px}
     const line = d3.line().x((d) => x(d.t)).y((d) => y(d.p));
     svg.append('path').datum(act).attr('fill', 'none').attr('stroke', ACC).attr('stroke-width', 2.2).attr('d', line);
     svg.append('path').datum(fc).attr('fill', 'none').attr('stroke', ACC).attr('stroke-width', 1.8).attr('stroke-dasharray', '5 4').attr('d', line);
+    if (fh) svg.append('path').datum(fh).attr('fill', 'none').attr('stroke', '#7aa2f7').attr('stroke-width', 1.8).attr('stroke-dasharray', '5 4').attr('d', line);
     svg.append('g').selectAll('circle').data(act).join('circle').attr('cx', (d) => x(d.t)).attr('cy', (d) => y(d.p)).attr('r', 3).attr('fill', ACC);
   }
   function seriesFor(name) {
@@ -576,14 +589,18 @@ footer details{margin-top:6px}
         el('div', { class: 'mono', style: 'font-size:28px;margin-top:4px' }, fmtP(i.p) + ' ', el('span', { class: 'mut', style: 'font-size:14px', text: altP(i.p) })),
         i.g === 'Uniques' ? el('div', { style: 'margin-top:10px' }, tradeLink(i, 'Search on official trade ↗')) : null),
       el('div', { class: 'stats' }, stat('1h', pct(i.c1), cls(i.c1)), stat('6h', pct(i.c6), cls(i.c6)), stat('24h', pct(v24(i)), cls(v24(i))),
-        stat('Since first traded', pct(i.chg), cls(i.chg)), stat('7-day forecast', pct(i.f7), cls(i.f7)), stat('Signal', `${i.sig} · ${i.conf}`, 't'),
+        stat('Since first traded', pct(i.chg), cls(i.chg)),
+        stat('7 days · current trend', pct(i.ft), cls(i.ft)),
+        stat(i.fhs === 'category' ? `7 days · past leagues (${i.c})` : '7 days · past leagues', pct(i.fh), cls(i.fh)),
+        stat('Backtested call', `${i.sig} (${pct(i.f7)}) · ${i.conf}`, 't'),
         stat('Momentum', i.tr, 't'), stat('Liquidity', i.v != null ? short(i.v) + 'c/day' : i.ls != null ? i.ls + ' listed' : '—'),
         i.vh != null ? stat('Traded last hour', short(i.vh) + 'c') : null,
-        i.hp != null ? stat(`This item, past leagues (day ${M.leagueDay})`, pct(i.hp), cls(i.hp)) : null,
-        i.cp != null ? stat(`${i.c}, past leagues`, pct(i.cp), cls(i.cp)) : null),
+        null),
+      callNote(i),
       el('section', {}, el('h3', { style: 'margin:6px 0 2px;font-size:14px', text: 'Hourly · last 48h' }),
         el('p', { class: 'mut', style: 'font-size:12px;margin:0 0 8px', text: sr && sr.src === 'fx' ? 'Faustus trades: line = volume-weighted price, band = low–high rate, bars = Chaos traded' : 'poe.ninja hourly snapshots' }), hourHost),
-      el('section', {}, el('h3', { style: 'margin:6px 0 2px;font-size:14px', text: 'Daily · since league start + 7-day forecast' }), dayHost),
+      el('section', {}, el('h3', { style: 'margin:6px 0 2px;font-size:14px', text: 'Daily · since league start + both 7-day predictions' }),
+        el('div', { class: 'legend' }, el('span', {}, el('i', { class: 'sw' }), 'Actual'), el('span', {}, el('i', { class: 'sw d' }), 'Current trend'), el('span', {}, el('i', { class: 'sw d', style: 'border-color:#7aa2f7' }), 'Like past leagues')), dayHost),
       el('section', {}, el('h3', { style: 'margin:6px 0 2px;font-size:14px', text: 'Compare with past leagues' }), cmpHost));
     $('#drawerHost').replaceChildren(el('div', { class: 'scrim', onclick: closeDrawer }), d);
     document.body.style.overflow = 'hidden';
@@ -604,7 +621,7 @@ footer details{margin-top:6px}
   let rw = window.innerWidth; window.addEventListener('resize', () => { if (Math.abs(window.innerWidth - rw) > 40) { rw = window.innerWidth; drawDivine(); } });
 
   if (window.matchMedia('(max-width: 900px)').matches) $('#fbox').removeAttribute('open');
-  load(true).catch(() => { $('#tbody').replaceChildren(el('tr', {}, el('td', { colspan: 10, class: 'empty', text: 'Could not load market data.' }))); });
+  load(true).catch(() => { $('#tbody').replaceChildren(el('tr', {}, el('td', { colspan: 11, class: 'empty', text: 'Could not load market data.' }))); });
 })();
 </script>
 </body>

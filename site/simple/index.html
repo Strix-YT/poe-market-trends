@@ -382,8 +382,9 @@ footer summary{cursor:pointer;color:var(--muted)}
         el('div', { class: 'mono', style: 'font-size:28px;margin-top:6px' }, fmtP(i.p) + ' ', el('span', { class: 'mut', style: 'font-size:14px', text: altP(i.p) })),
         tradeLink(i, 'Search on official trade ↗') ? el('div', { style: 'margin-top:10px' }, tradeLink(i, 'Search on official trade ↗')) : null),
       el('div', { class: 'stats' }, stat('Last hour', pct(i.c1), cls(i.c1)), stat('24 hours', pct(v24(i)), cls(v24(i))), stat('7-day outlook', pct(i.f7), cls(i.f7)),
+        stat('7d if trend continues', pct(i.ft), cls(i.ft)), stat(i.fhs === 'category' ? '7d like past leagues (category)' : '7d like past leagues', pct(i.fh), cls(i.fh)),
         stat('Since first traded', pct(i.chg), cls(i.chg)), stat('Trades', i.v != null ? short(i.v) + 'c/day' : i.ls != null ? i.ls + ' listed' : '—'), stat('Confidence', i.conf),
-        i.hp != null ? stat('Past leagues, this item', pct(i.hp), cls(i.hp)) : null, i.cp != null ? stat('Past leagues, category', pct(i.cp), cls(i.cp)) : null),
+        null),
       el('section', {}, el('h3', { style: 'font-size:15px;margin:0 0 6px', text: 'Last 48 hours' }), hourHost),
       el('section', {}, el('h3', { style: 'font-size:15px;margin:0 0 6px', text: 'Daily, with 7-day outlook (dashed)' }), dayHost));
     openPanel(node, i.n);
