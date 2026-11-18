@@ -17,9 +17,13 @@ Hourly trades come from GGG's own [currency exchange API](https://www.pathofexil
 - `scripts/build.py` pulls each category from poe.ninja, converts prices to Divine terms and fits a damped-momentum 7-day forecast. It also pulls the last 48 completed hours from the Faustus API (volume-weighted price, volume, low/high rate) and keeps a rolling hourly history by reading the previous `hourly.json` from the live site. Output: `site/data/market.json` and `site/data/hourly.json`.
 - The workflow publishes `site/` to GitHub Pages. No data is committed to the repo.
 
+## Learning from past leagues
+
+`.github/workflows/history.yml` (monthly, or on demand) runs `scripts/history.py`: it downloads poe.ninja's economy dumps for recent leagues (Allflame, Mirage, Keepers, Mercenaries, Settlers), replays them day by day, and compares forecasts against what actually happened (leave one league out). The winning weights and the per-item / per-category / Divine league-day patterns are saved to `data/priors.json`, which the hourly build uses. In the current replay, Gain/Lose calls came true about 63% of the time, versus 46% for plain momentum.
+
 ## Changing league
 
-Edit `LEAGUE` in `.github/workflows/refresh.yml` (use the league name as it appears in poe.ninja's URL, e.g. `Covens`).
+Edit `LEAGUE` and `LEAGUE_START` (first day of data) in `.github/workflows/refresh.yml`, and add the finished league to the `history.yml` list.
 
 ## Local preview
 

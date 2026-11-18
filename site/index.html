@@ -223,7 +223,7 @@ footer details{margin-top:6px}
   <details>
     <summary>How the numbers work</summary>
     <p><b>Hourly (1h, 6h, 24h):</b> for currency-exchange items, each hour's price is the volume-weighted average rate on Faustus for the last completed hour (GGG publishes each hour once it ends, so the newest point is up to an hour old). Uniques and cards aren't traded on Faustus, so their hourly moves come from hourly poe.ninja snapshots. Where hourly history is too short, 24h falls back to poe.ninja's daily change.</p>
-    <p><b>7-day forecast:</b> prices are converted to Divines, then a damped-momentum model projects the latest daily moves forward (75% of the last day's change plus 25% of the day before, shrinking 45% a day, capped at roughly ±80% a day). Gain or Lose means a projected move beyond ±10% in Divines. Confidence follows liquidity: currency by Chaos traded per day (High ≥ 20,000c, Medium ≥ 3,000c), Uniques by trade listings (High ≥ 100, Medium ≥ 25).</p>
+    <p><b>7-day forecast:</b> prices are converted to Divines. The forecast combines two things learned from past leagues: big recent moves tend to partly pull back, and each category tends to move a certain way at a given point in a league. The weights were picked by replaying the last five leagues day by day (<span id="btLeagues">—</span>). <span id="btNote"></span> Gain or Lose means a projected move beyond ±10% in Divines. Confidence follows liquidity: currency by Chaos traded per day (High ≥ 20,000c, Medium ≥ 3,000c), Uniques by trade listings (High ≥ 100, Medium ≥ 25).</p>
     <p>This is a short-term momentum read, not trading advice. Patches, new strategies and meta shifts move prices in ways no trend line can see.</p>
   </details>
 </footer>
@@ -342,7 +342,7 @@ footer details{margin-top:6px}
 
   // ---------------------------------------------------------------- render
   let ROWS = [];
-  function render() { if (!M) return; ROWS = sorted(filtered()); renderTicker(); renderKpis(); renderTable(); renderHeat(); }
+  function render() { if (!M) return; ROWS = sorted(filtered()); renderTicker(); renderKpis(); renderTable(); renderHeat(); renderMethod(); }
   function renderTicker() {
     const byN = new Map(M.items.map((i) => [i.n, i]));
     const d = M.divine; const cur = (d.h || []).filter((x) => x != null).slice(-1)[0];
@@ -353,6 +353,12 @@ footer details{margin-top:6px}
     if (hi) t.append(el('span', {}, '1H MOVER ', el('b', { text: hi.n }), ' ', el('span', { class: cls(hi.c1), text: pct(hi.c1) })));
     const g = new Date(M.generatedAt); const mins = Math.round((Date.now() - g) / 60000);
     $('#stamp').textContent = `Updated ${d3.utcFormat('%H:%M')(g)} UTC (${mins < 60 ? mins + ' min' : Math.round(mins / 60) + 'h'} ago)`;
+  }
+  function renderMethod() {
+    const P = M.priors; if (!P) return;
+    const b = P.backtest.items, best = b.best, mom = b.momentumOnly;
+    const lg = $('#btLeagues'); if (lg) lg.textContent = P.leagues.join(', ');
+    const n = $('#btNote'); if (n) n.textContent = `In that replay its Gain calls came true ${best.gainRightPct}% of the time and its Lose calls ${best.loseRightPct}% (a plain momentum forecast managed ${mom.gainRightPct}% and ${mom.loseRightPct}%). Covens is on day ${M.leagueDay}.`;
   }
   function renderKpis() {
     const d = M.divine; const cur = (d.h || []).filter((x) => x != null).slice(-1)[0];
@@ -491,7 +497,9 @@ footer details{margin-top:6px}
       el('div', { class: 'stats' }, stat('1h', pct(i.c1), cls(i.c1)), stat('6h', pct(i.c6), cls(i.c6)), stat('24h', pct(v24(i)), cls(v24(i))),
         stat('Since first traded', pct(i.chg), cls(i.chg)), stat('7-day forecast', pct(i.f7), cls(i.f7)), stat('Signal', `${i.sig} · ${i.conf}`, 't'),
         stat('Momentum', i.tr, 't'), stat('Liquidity', i.v != null ? short(i.v) + 'c/day' : i.ls != null ? i.ls + ' listed' : '—'),
-        i.vh != null ? stat('Traded last hour', short(i.vh) + 'c') : null),
+        i.vh != null ? stat('Traded last hour', short(i.vh) + 'c') : null,
+        i.hp != null ? stat(`This item, past leagues (day ${M.leagueDay})`, pct(i.hp), cls(i.hp)) : null,
+        i.cp != null ? stat(`${i.c}, past leagues`, pct(i.cp), cls(i.cp)) : null),
       el('section', {}, el('h3', { style: 'margin:6px 0 2px;font-size:14px', text: 'Hourly · last 48h' }),
         el('p', { class: 'mut', style: 'font-size:12px;margin:0 0 8px', text: sr && sr.src === 'fx' ? 'Faustus trades: line = volume-weighted price, band = low–high rate, bars = Chaos traded' : 'poe.ninja hourly snapshots' }), hourHost),
       el('section', {}, el('h3', { style: 'margin:6px 0 2px;font-size:14px', text: 'Daily · since league start + 7-day forecast' }), dayHost));

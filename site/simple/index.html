@@ -186,7 +186,7 @@ footer summary{cursor:pointer;color:var(--muted)}
 
   <footer>
     <details><summary>How the numbers work</summary>
-      <p>Hourly prices for currency, fragments, essences and cards come from GGG's currency exchange (Faustus): the volume-weighted rate in the last completed hour. Uniques come from hourly poe.ninja snapshots. The 7-day outlook converts prices to Divines and projects the latest daily momentum forward, fading it each day. "Rising" and "Falling" outlooks mean a projected move of more than 10% against the Divine Orb. Liquidity is how much trades per day (currency) or how many are listed (uniques). This is a short-term trend read, not trading advice.</p>
+      <p>Hourly prices for currency, fragments, essences and cards come from GGG's currency exchange (Faustus): the volume-weighted rate in the last completed hour. Uniques come from hourly poe.ninja snapshots. The 7-day outlook converts prices to Divines and combines two patterns learned by replaying the last five leagues: big recent moves tend to partly pull back, and each category tends to move a certain way at each point in a league. "Rising" and "Falling" outlooks mean a projected move of more than 10% against the Divine Orb. Liquidity is how much trades per day (currency) or how many are listed (uniques). This is a short-term trend read, not trading advice.</p>
     </details>
     <p>Data: GGG currency exchange and poe.ninja. Not affiliated with Grinding Gear Games or poe.ninja. <a href="https://github.com/Strix-YT/poe-market-trends">Source on GitHub</a> · <a href="../">Classic layout</a></p>
   </footer>
@@ -382,7 +382,8 @@ footer summary{cursor:pointer;color:var(--muted)}
         el('div', { class: 'mono', style: 'font-size:28px;margin-top:6px' }, fmtP(i.p) + ' ', el('span', { class: 'mut', style: 'font-size:14px', text: altP(i.p) })),
         tradeLink(i, 'Search on official trade ↗') ? el('div', { style: 'margin-top:10px' }, tradeLink(i, 'Search on official trade ↗')) : null),
       el('div', { class: 'stats' }, stat('Last hour', pct(i.c1), cls(i.c1)), stat('24 hours', pct(v24(i)), cls(v24(i))), stat('7-day outlook', pct(i.f7), cls(i.f7)),
-        stat('Since first traded', pct(i.chg), cls(i.chg)), stat('Trades', i.v != null ? short(i.v) + 'c/day' : i.ls != null ? i.ls + ' listed' : '—'), stat('Confidence', i.conf)),
+        stat('Since first traded', pct(i.chg), cls(i.chg)), stat('Trades', i.v != null ? short(i.v) + 'c/day' : i.ls != null ? i.ls + ' listed' : '—'), stat('Confidence', i.conf),
+        i.hp != null ? stat('Past leagues, this item', pct(i.hp), cls(i.hp)) : null, i.cp != null ? stat('Past leagues, category', pct(i.cp), cls(i.cp)) : null),
       el('section', {}, el('h3', { style: 'font-size:15px;margin:0 0 6px', text: 'Last 48 hours' }), hourHost),
       el('section', {}, el('h3', { style: 'font-size:15px;margin:0 0 6px', text: 'Daily, with 7-day outlook (dashed)' }), dayHost));
     openPanel(node, i.n);
