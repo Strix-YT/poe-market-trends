@@ -1,0 +1,40 @@
+name: Learn from past leagues
+
+on:
+  workflow_dispatch:
+    inputs:
+      leagues:
+        description: "Comma-separated poe.ninja dump names (newest first)"
+        required: false
+        default: "Allflame,Mirage,Keepers,Mercenaries,Settlers"
+  schedule:
+    - cron: "17 3 2 * *"   # monthly, picks up newly finished leagues
+
+permissions:
+  contents: write
+
+concurrency:
+  group: history
+  cancel-in-progress: false
+
+jobs:
+  priors:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download past leagues, build priors, backtest
+        env:
+          HISTORY_LEAGUES: ${{ github.event.inputs.leagues || 'Allflame,Mirage,Keepers,Mercenaries,Settlers' }}
+        run: python scripts/history.py data/priors.json
+      - name: Commit priors
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/priors.json
+          if git diff --cached --quiet; then echo "no change"; exit 0; fi
+          git commit -m "Update past-league priors"
+          git push
