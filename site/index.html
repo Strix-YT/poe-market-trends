@@ -109,6 +109,15 @@ td.nm small{display:block;color:var(--dim);font-weight:400;font-size:11px}
 .stat{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px}
 .stat .k{font-size:11px;color:var(--muted)}.stat .v{font-family:var(--mono);font-size:16px;margin-top:3px}.stat .v.t{font-family:var(--sans);font-size:14px;font-weight:600}
 .x{position:absolute;top:14px;right:14px}
+.cmp-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0 8px}
+.cmp-legend{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+.cmp-legend button{font-size:12px;background:var(--panel2);border:1px solid var(--line2);border-radius:999px;padding:3px 10px;cursor:pointer;color:var(--fg2);display:inline-flex;align-items:center;gap:6px}
+.cmp-legend button[aria-pressed=false]{opacity:.45}
+.cmp-legend i{display:inline-block;width:10px;height:10px;border-radius:2px}
+.cmp-tbl{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}
+.cmp-tbl th,.cmp-tbl td{padding:6px 8px;text-align:right;border-top:1px solid var(--line);white-space:nowrap}
+.cmp-tbl th{color:var(--muted);font-weight:500;position:static;background:none;cursor:default}
+.cmp-tbl th:first-child,.cmp-tbl td:first-child{text-align:left}
 footer{padding:0 22px 40px;color:var(--muted);font-size:12px;line-height:1.6;max-width:1100px}
 footer details{margin-top:6px}
 .empty{padding:30px;text-align:center;color:var(--muted)}
@@ -480,13 +489,85 @@ footer details{margin-top:6px}
     hourlyChart(host, sr, { aria: 'Divine Orb hourly price in chaos, last 48 hours' });
   }
 
+
+  // ---------------------------------------------------------------- compare with past leagues
+  const CMP = { idx: undefined, shards: {}, league: undefined, unit: 'c', range: 30, hidden: new Set() };
+  const LCOL = ['#7aa2f7', '#bb9af7', '#9ece6a', '#7dcfff', '#f7768e', '#c0caf5', '#ff9e64'];
+  async function cmpIndex() { if (CMP.idx === undefined) { try { CMP.idx = await fetch('data/curves/index.json').then((r) => r.ok ? r.json() : null); } catch (e) { CMP.idx = null; } } return CMP.idx; }
+  async function cmpLeague() { if (CMP.league === undefined) { try { CMP.league = await fetch('data/league.json?t=' + Date.now(), { cache: 'no-store' }).then((r) => r.ok ? r.json() : null); } catch (e) { CMP.league = null; } } return CMP.league; }
+  function shardOf(name, n) { let h = 5381; for (const ch of name) h = (Math.imul(h, 33) ^ ch.codePointAt(0)) >>> 0; return h % n; }
+  async function cmpShard(i) { if (!(i in CMP.shards)) { try { CMP.shards[i] = await fetch(`data/curves/${i}.json`).then((r) => r.ok ? r.json() : {}); } catch (e) { CMP.shards[i] = {}; } } return CMP.shards[i]; }
+  async function renderCompare(host, item) {
+    host.replaceChildren(el('div', { class: 'empty', style: 'padding:16px', text: 'Loading past leagues…' }));
+    const [idx, cur] = await Promise.all([cmpIndex(), cmpLeague()]);
+    if (!idx) { host.replaceChildren(el('div', { class: 'empty', style: 'padding:16px', text: 'Past-league prices are not available yet.' })); return; }
+    const past = (await cmpShard(shardOf(item.n, idx.shards)))[item.n] || {};
+    const today = M.leagueDay;
+    const series = idx.leagues.filter((l) => past[l.name]).map((l, k) => ({ name: l.name, col: LCOL[k % LCOL.length], c: past[l.name], div: idx.divine[l.name] || [] }));
+    const curArr = cur && cur.s ? cur.s[item.n] : null;
+    if (curArr) series.unshift({ name: (M.league || 'Now') + ' (now)', col: ACC, c: curArr, div: cur.div || [], current: true });
+    if (!series.some((x) => !x.current)) { host.replaceChildren(el('div', { class: 'empty', style: 'padding:16px', text: 'No past-league prices for this item. It may be new this league, or never traded enough.' })); return; }
+    const draw = () => {
+      const chartHost = el('div', { class: 'chart', style: 'min-height:220px' });
+      const segU = el('div', { class: 'seg', role: 'group', 'aria-label': 'Unit' }, ...[['c', 'Chaos'], ['d', 'Divine']].map(([v, l]) => el('button', { type: 'button', 'aria-pressed': CMP.unit === v, onclick: () => { CMP.unit = v; draw(); } }, l)));
+      const segR = el('div', { class: 'seg', role: 'group', 'aria-label': 'Days shown' }, ...[[14, 'First 2 weeks'], [30, 'First month'], [120, 'Whole league']].map(([v, l]) => el('button', { type: 'button', 'aria-pressed': CMP.range === v, onclick: () => { CMP.range = v; draw(); } }, l)));
+      const legend = el('div', { class: 'cmp-legend' }, ...series.map((x) => el('button', { type: 'button', 'aria-pressed': !CMP.hidden.has(x.name), onclick: () => { CMP.hidden.has(x.name) ? CMP.hidden.delete(x.name) : CMP.hidden.add(x.name); draw(); } }, el('i', { style: `background:${x.col}` }), x.name)));
+      const tbl = el('table', { class: 'cmp-tbl' }, el('thead', {}, el('tr', {}, ...['League', `Day ${today}`, `Day ${today + 7}`, 'Change', 'Peak', 'Low'].map((h) => el('th', { text: h })))));
+      const val = (x, d) => { const v = x.c[d]; if (v == null) return null; if (CMP.unit === 'c') return v; const r = x.div[d]; return r ? v / r : null; };
+      const fmtU = (v) => v == null ? '—' : CMP.unit === 'c' ? fmtC(v) + 'c' : fmtD(v) + ' div';
+      const tb = el('tbody');
+      series.forEach((x) => {
+        const a = val(x, today), b = x.current ? null : val(x, today + 7);
+        const pts = x.c.map((_, d) => [d, val(x, d)]).filter((p) => p[1] != null);
+        const pk = pts.length ? pts.reduce((m, p) => p[1] > m[1] ? p : m) : null, lo = pts.length ? pts.reduce((m, p) => p[1] < m[1] ? p : m) : null;
+        const ch = a && b ? (b / a - 1) * 100 : null;
+        tb.append(el('tr', {}, el('td', {}, el('i', { style: `display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;background:${x.col}` }), x.name),
+          el('td', { class: 'mono', text: fmtU(a) }), el('td', { class: 'mono', text: x.current ? '…' : fmtU(b) }), el('td', { class: 'mono ' + cls(ch), text: pct(ch) }),
+          el('td', { class: 'mono', text: pk ? `${fmtU(pk[1])} (day ${pk[0]})` : '—' }), el('td', { class: 'mono', text: lo ? `${fmtU(lo[1])} (day ${lo[0]})` : '—' })));
+      });
+      tbl.append(tb);
+      host.replaceChildren(el('div', { class: 'cmp-bar' }, segU, segR), legend, chartHost, tbl,
+        el('p', { class: 'mut', style: 'font-size:12px;margin:6px 0 0', text: 'Day 0 = first day of each league. Log scale, so equal steps mean equal % moves. Click a league to hide or show it.' }));
+      requestAnimationFrame(() => cmpChart(chartHost, series.filter((x) => !CMP.hidden.has(x.name)), val, fmtU, today));
+    };
+    draw();
+  }
+  function cmpChart(host, series, val, fmtU, today) {
+    host.replaceChildren();
+    const maxD = Math.max(CMP.range === 120 ? d3.max(series, (x) => x.c.length - 1) || 30 : CMP.range, today + 1);
+    const lines = series.map((x) => ({ ...x, pts: d3.range(0, maxD + 1).map((d) => ({ d, v: val(x, d) })).filter((p) => p.v != null && p.v > 0) })).filter((x) => x.pts.length);
+    if (!lines.length) { host.append(el('div', { class: 'empty', text: 'Nothing to show for this range.' })); return; }
+    const W = Math.max(280, host.clientWidth), Hh = 220, m = { t: 8, r: 10, b: 26, l: 10 };
+    const svg = d3.select(host).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${Hh}`).attr('role', 'img').attr('aria-label', 'Price by league day, this league versus past leagues');
+    const all = lines.flatMap((x) => x.pts.map((p) => p.v));
+    const y = d3.scaleLog().domain(d3.extent(all)).nice();
+    const probe = svg.append('text').attr('class', 'tick').append('tspan').text(fmtU(+y.domain()[1].toPrecision(2))); m.l = Math.ceil(probe.node().getComputedTextLength()) + 12; probe.node().parentNode.remove();
+    const x = d3.scaleLinear().domain([0, maxD]).range([m.l, W - m.r]); y.range([Hh - m.b, m.t]);
+    const [ya, yb] = y.domain(), tv = d3.range(5).map((k) => Math.exp(Math.log(ya) + (Math.log(yb) - Math.log(ya)) * k / 4));
+    svg.append('g').attr('class', 'grid').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).tickValues(tv).tickSize(-(W - m.l - m.r)).tickFormat(''));
+    svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).tickValues(tv).tickFormat((v) => fmtU(+v.toPrecision(2)))).call((g) => g.select('.domain').remove());
+    svg.append('g').attr('transform', `translate(0,${Hh - m.b})`).call(d3.axisBottom(x).ticks(Math.min(W < 450 ? 5 : 8, maxD)).tickFormat((d) => d === 0 ? 'day 0' : String(d)));
+    svg.append('line').attr('x1', x(today)).attr('x2', x(today)).attr('y1', m.t).attr('y2', Hh - m.b).attr('stroke', '#5d6573').attr('stroke-dasharray', '3 3');
+    svg.append('text').attr('x', x(today) + 4).attr('y', m.t + 10).attr('fill', '#8b93a1').attr('font-size', 11).text('today');
+    const line = d3.line().x((p) => x(p.d)).y((p) => y(p.v));
+    lines.slice().sort((a, b) => (a.current ? 1 : 0) - (b.current ? 1 : 0)).forEach((s2) => svg.append('path').datum(s2.pts).attr('fill', 'none').attr('stroke', s2.col).attr('stroke-width', s2.current ? 3 : 1.6).attr('opacity', s2.current ? 1 : 0.85).attr('d', line));
+    const tip = d3.select(host).append('div').attr('class', 'tip').style('display', 'none');
+    const guide = svg.append('line').attr('y1', m.t).attr('y2', Hh - m.b).attr('stroke', '#8b93a1').style('display', 'none');
+    svg.append('rect').attr('x', m.l).attr('width', W - m.l - m.r).attr('height', Hh).attr('fill', 'transparent')
+      .on('pointermove', (ev) => { const [mx] = d3.pointer(ev); const d = Math.max(0, Math.min(maxD, Math.round(x.invert(mx))));
+        guide.style('display', null).attr('x1', x(d)).attr('x2', x(d)); tip.style('display', null).selectAll('*').remove();
+        tip.append('div').attr('class', 'mut').text('Day ' + d);
+        lines.forEach((s2) => { const p = s2.pts.find((q) => q.d === d); if (p) tip.append('div').style('color', s2.col).text(`${s2.name}: ${fmtU(p.v)}`); });
+        const tw = tip.node().offsetWidth, sx = x(d) / W * host.clientWidth; tip.style('left', Math.max(0, Math.min(host.clientWidth - tw, sx + 12)) + 'px').style('top', '0px'); })
+      .on('pointerleave', () => { tip.style('display', 'none'); guide.style('display', 'none'); });
+  }
   // ---------------------------------------------------------------- drawer
   let lastFocus = null;
   function closeDrawer() { $('#drawerHost').replaceChildren(); document.body.style.overflow = ''; if (lastFocus) lastFocus.focus(); }
   function openDrawer(i) {
     lastFocus = document.activeElement;
     const stat = (k, v, c) => el('div', { class: 'stat' }, el('div', { class: 'k', text: k }), el('div', { class: 'v ' + (c || ''), text: v }));
-    const hourHost = el('div', { class: 'chart', style: 'min-height:200px' }), dayHost = el('div', { class: 'chart', style: 'min-height:170px' });
+    const hourHost = el('div', { class: 'chart', style: 'min-height:200px' }), dayHost = el('div', { class: 'chart', style: 'min-height:170px' }), cmpHost = el('div', { style: 'min-height:260px' });
     const closeBtn = el('button', { class: 'btn2 x', type: 'button', 'aria-label': 'Close details', text: '✕', onclick: closeDrawer });
     const sr = seriesFor(i.n);
     const d = el('div', { class: 'drawer', role: 'dialog', 'aria-modal': 'true', 'aria-label': i.n + ' details' },
@@ -502,11 +583,12 @@ footer details{margin-top:6px}
         i.cp != null ? stat(`${i.c}, past leagues`, pct(i.cp), cls(i.cp)) : null),
       el('section', {}, el('h3', { style: 'margin:6px 0 2px;font-size:14px', text: 'Hourly · last 48h' }),
         el('p', { class: 'mut', style: 'font-size:12px;margin:0 0 8px', text: sr && sr.src === 'fx' ? 'Faustus trades: line = volume-weighted price, band = low–high rate, bars = Chaos traded' : 'poe.ninja hourly snapshots' }), hourHost),
-      el('section', {}, el('h3', { style: 'margin:6px 0 2px;font-size:14px', text: 'Daily · since league start + 7-day forecast' }), dayHost));
+      el('section', {}, el('h3', { style: 'margin:6px 0 2px;font-size:14px', text: 'Daily · since league start + 7-day forecast' }), dayHost),
+      el('section', {}, el('h3', { style: 'margin:6px 0 2px;font-size:14px', text: 'Compare with past leagues' }), cmpHost));
     $('#drawerHost').replaceChildren(el('div', { class: 'scrim', onclick: closeDrawer }), d);
     document.body.style.overflow = 'hidden';
     closeBtn.focus();
-    requestAnimationFrame(() => { if (sr) hourlyChart(hourHost, sr, { aria: i.n + ' hourly price' }); else hourHost.append(el('div', { class: 'empty', text: H ? 'No hourly history for this item yet.' : 'Loading hourly data…' })); dailyChart(dayHost, i); });
+    requestAnimationFrame(() => { if (sr) hourlyChart(hourHost, sr, { aria: i.n + ' hourly price' }); else hourHost.append(el('div', { class: 'empty', text: H ? 'No hourly history for this item yet.' : 'Loading hourly data…' })); dailyChart(dayHost, i); renderCompare(cmpHost, i); });
   }
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#drawerHost').children.length) closeDrawer(); });
 

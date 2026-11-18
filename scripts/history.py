@@ -44,6 +44,8 @@ GRID_H = [0, 0.5, 1.0]
 GRID_C = [0, 0.5, 1.0, 1.5]
 MIN_CALL_SHARE = 0.03   # a usable model must flag at least 3% of item-days as Gain and as Lose
 SAMPLE = 400_000      # backtest rows used for the weight search
+CURVE_DAYS = 120      # league days kept for the price-comparison curves
+SHARDS = 64           # curve files; the page fetches only the one holding the item it shows
 
 
 def log(*a):
@@ -186,6 +188,45 @@ def prior_from(per_league, d, exclude=None):
     return (statistics.median(vals), len(vals)) if vals else (None, 0)
 
 
+def shard_of(name):
+    """djb2 hash, mirrored in the page's JavaScript."""
+    h = 5381
+    for ch in name:
+        h = ((h * 33) ^ ord(ch)) & 0xFFFFFFFF
+    return h % SHARDS
+
+
+def sig3(v):
+    return None if v is None else float(f"{v:.3g}")
+
+
+def write_curves(leagues, out_dir):
+    """Per item, per past league: chaos price by league day (0..CURVE_DAYS-1), split into SHARDS files."""
+    os.makedirs(out_dir, exist_ok=True)
+    shards = [dict() for _ in range(SHARDS)]
+    for lg, L in leagues.items():
+        for n, s in L["raw"].items():
+            arr = [sig3(s.get(d)) for d in range(CURVE_DAYS)]
+            while arr and arr[-1] is None:
+                arr.pop()
+            if sum(x is not None for x in arr) >= 5:
+                shards[shard_of(n)].setdefault(n, {})[lg] = arr
+    total = 0
+    for i, sh in enumerate(shards):
+        with open(f"{out_dir}/{i}.json", "w") as fh:
+            json.dump(sh, fh, separators=(",", ":"))
+        total += os.path.getsize(f"{out_dir}/{i}.json")
+    index = {
+        "generatedAt": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+        "shards": SHARDS, "days": CURVE_DAYS,
+        "leagues": [{"name": lg, "start": L["start"], "days": L["days"]} for lg, L in leagues.items()],
+        "divine": {lg: [sig3(L["divine"].get(d)) for d in range(CURVE_DAYS)] for lg, L in leagues.items()},
+    }
+    with open(f"{out_dir}/index.json", "w") as fh:
+        json.dump(index, fh, separators=(",", ":"))
+    log(f"curves: {sum(len(x) for x in shards)} items in {SHARDS} files, {total/1e6:.1f} MB")
+
+
 def main(out_file):
     leagues = {}
     for name in DUMPS:
@@ -195,9 +236,11 @@ def main(out_file):
         except Exception as e:
             log(f"skip {name}: {e}")
             continue
-        leagues[lg] = {"start": start, "divine": divine, "logs": to_divine_logs(divine, items), "days": max(divine) if divine else 0}
+        leagues[lg] = {"start": start, "divine": divine, "logs": to_divine_logs(divine, items), "days": max(divine) if divine else 0,
+                       "raw": {n: s for n, s in items.items() if len(s) >= 5 and max(s.values()) >= 1}}
     if len(leagues) < 2:
         raise SystemExit("need at least two leagues")
+    write_curves(leagues, os.environ.get("CURVES_DIR", "curves"))
 
     # item -> league -> {day: log divine price}
     by_item = defaultdict(dict)

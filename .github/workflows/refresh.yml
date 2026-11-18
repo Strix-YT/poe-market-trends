@@ -24,6 +24,13 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - name: Past-league price curves
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          ref: curves
+          path: site/data/curves
+      - run: rm -rf site/data/curves/.git
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -32,6 +39,7 @@ jobs:
           LEAGUE: Covens
           LEAGUE_START: "2026-11-14"
           PREV_HOURLY_URL: https://strix-yt.github.io/poe-market-trends/data/hourly.json
+          PREV_LEAGUE_URL: https://strix-yt.github.io/poe-market-trends/data/league.json
         run: python scripts/build.py site/data
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

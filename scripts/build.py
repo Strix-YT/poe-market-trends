@@ -34,6 +34,7 @@ LEAGUE = os.environ.get("LEAGUE", "Covens")
 LEAGUE_START = os.environ.get("LEAGUE_START", "2026-11-14")   # first day of poe.ninja data for the league
 PRIORS_FILE = os.environ.get("PRIORS_FILE", "data/priors.json")    # built by scripts/history.py
 PREV_HOURLY_URL = os.environ.get("PREV_HOURLY_URL", "")
+PREV_LEAGUE_URL = os.environ.get("PREV_LEAGUE_URL", "")
 HOURLY_KEEP_HOURS = 48
 PHI = 0.55
 MIN_VOLUME = 50       # exchange items: chaos traded per day
@@ -512,6 +513,33 @@ def attach_hourly(market, fx, nj):
                         "fxLast": fx["t"][-1] if fx["t"] else None, "sources": dict(used)}
 
 
+def update_league(market, prev):
+    """Daily chaos price of every item since league start, carried forward run to run.
+    The last 7 days are always rewritten from poe.ninja's latest history."""
+    start = datetime.date.fromisoformat(LEAGUE_START)
+    if prev.get("start") != LEAGUE_START:
+        prev = {}
+    series = {k: list(v) for k, v in (prev.get("s") or {}).items()}
+    div = list(prev.get("div") or [])
+
+    def put(arr, idx, v):
+        if idx < 0 or v is None:
+            return arr
+        arr = arr + [None] * (idx + 1 - len(arr))
+        arr[idx] = v
+        return arr
+
+    idxs = [(datetime.date.fromisoformat(d) - start).days for d in market["days"]]
+    for it in market["items"]:
+        arr = series.get(it["n"], [])
+        for k, v in zip(idxs, it["h"]):
+            arr = put(arr, k, v)
+        series[it["n"]] = arr
+    for k, v in zip(idxs, market["divine"]["h"]):
+        div = put(div, k, v)
+    return {"start": LEAGUE_START, "league": LEAGUE, "s": series, "div": div}
+
+
 def load_prev_hourly():
     if not PREV_HOURLY_URL:
         return {}
@@ -544,6 +572,15 @@ if __name__ == "__main__":
         prev_fx = prev.get("fx") if prev.get("fxv") == FX_VERSION else {}
         fx = update_fx(prev_fx or {}, now, known)
     attach_hourly(market, fx, nj)
+    prev_league = {}
+    if PREV_LEAGUE_URL:
+        try:
+            prev_league = get(PREV_LEAGUE_URL + f"?t={int(time.time())}", tries=2)
+        except Exception as e:
+            print(f"note: no previous league file ({e}); starting from the last 7 days", file=sys.stderr)
+    league = update_league(market, prev_league)
+    with open(f"{out_dir}/league.json", "w") as fh:
+        json.dump(league, fh, separators=(",", ":"))
     with open(f"{out_dir}/market.json", "w") as fh:
         json.dump(market, fh, separators=(",", ":"))
     with open(f"{out_dir}/hourly.json", "w") as fh:
