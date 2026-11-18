@@ -1,6 +1,6 @@
 # PoE market trends
 
-A mobile-friendly market tracker for Path of Exile 1 (Covens league): Currency, Fragments, Essences, Fossils, Oils, Tattoos, Divination Cards and Unique items, with 1h / 6h / 24h moves, hourly charts and 7-day forecasts.
+A trading-terminal style market page for Path of Exile 1 (Covens league): Currency, Fragments, Essences, Fossils, Oils, Tattoos, Divination Cards and Unique items, with 1h / 6h / 24h moves, hourly charts and 7-day forecasts.
 
 Hourly trades come from GGG's own [currency exchange API](https://www.pathofexile.com/developer/docs/reference#currencyexchange) (Faustus); daily history, Uniques and cards come from [poe.ninja](https://poe.ninja).
 
@@ -8,8 +8,8 @@ Hourly trades come from GGG's own [currency exchange API](https://www.pathofexil
 
 ## Pages
 
-- `/` — the main tracker: category tabs, Rising / Falling / Priciest over the last hour, 24 hours or 7-day outlook, a Filters panel, and item details with hourly and daily charts. Unique items link to the official trade site.
-- `/classic/` — the earlier trading-terminal layout with the full filter sidebar.
+- `/` — the trading-terminal layout: filter sidebar, 1h / 6h / 24h / 7-day movers, sortable table, Divine hourly chart, category heat map, and item details with hourly and daily charts. Unique items link to the official trade site.
+- `/simple/` — a simplified, phone-first layout with category tabs and item cards.
 
 ## How it works
 

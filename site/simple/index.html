@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exile Market · PoE price tracker</title>
+<meta name="description" content="Path of Exile market tracker: currency, cards, fragments and uniques with hourly moves and 7-day outlooks, from GGG's currency exchange and poe.ninja.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+:root{--bg:#0d0f12;--bg2:#111419;--panel:#14181d;--panel2:#1a1f26;--line:#22272e;--line2:#2d333c;--fg:#e8eaed;--fg2:#c4c9d1;--muted:#8b93a1;--dim:#5d6573;--accent:#e8b04a;--up:#3ecf8e;--dn:#f0616d;--mono:'JetBrains Mono',ui-monospace,monospace;--sans:Inter,system-ui,-apple-system,'Segoe UI',sans-serif}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px}
+a{color:var(--accent)}
+button,input,select{font:inherit;color:inherit}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.up{color:var(--up)}.dn{color:var(--dn)}.mut{color:var(--muted)}.dim{color:var(--dim)}
+.wrap{max-width:1100px;margin:0 auto;padding:0 20px}
+
+/* header */
+header{border-bottom:1px solid var(--line);background:var(--bg2)}
+.hd{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 20px}
+.brand{font-weight:700;letter-spacing:.02em;display:flex;align-items:center;gap:8px}
+.lg{font-size:12px;color:var(--muted);border:1px solid var(--line2);border-radius:4px;padding:2px 7px;font-weight:500}
+.hdR{margin-left:auto;display:flex;align-items:center;gap:14px;font-size:13px;color:var(--muted);flex-wrap:wrap}
+.div b{color:var(--fg);font-family:var(--mono)}
+.btn{background:var(--accent);color:#0d0f12;border:0;border-radius:8px;padding:9px 16px;font-weight:600;cursor:pointer;min-height:40px}
+.btn:disabled{opacity:.6}
+.btn2{background:var(--panel2);color:var(--fg2);border:1px solid var(--line2);border-radius:8px;padding:9px 14px;cursor:pointer;min-height:40px}
+
+/* intro + tabs */
+.intro{padding:22px 0 6px}
+.intro h1{font-size:22px;margin:0 0 6px}
+.intro p{margin:0;color:var(--muted);font-size:14px;line-height:1.5}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-top:18px;overflow-x:auto}
+.tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:12px 14px;color:var(--muted);cursor:pointer;white-space:nowrap;font-weight:500}
+.tabs button[aria-selected=true]{color:var(--fg);border-bottom-color:var(--accent)}
+.tabs select{background:none;border:0;color:var(--muted);padding:12px 10px;cursor:pointer;width:auto;max-width:180px}
+
+/* toolbar */
+.tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:16px 0}
+.search{flex:1 1 220px;background:var(--panel);border:1px solid var(--line2);border-radius:8px;padding:10px 12px;color:var(--fg)}
+.seg{display:flex;background:var(--panel);border:1px solid var(--line2);border-radius:8px;overflow:hidden}
+.seg button{background:none;border:0;padding:9px 13px;color:var(--fg2);cursor:pointer;font-size:14px}
+.seg button[aria-pressed=true]{background:var(--accent);color:#0d0f12;font-weight:600}
+.badge{display:inline-block;background:var(--accent);color:#0d0f12;border-radius:999px;font-size:11px;font-weight:700;padding:1px 7px;margin-left:6px}
+.count{font-size:13px;color:var(--muted);padding:0 0 10px}
+
+/* table */
+.tbl{border:1px solid var(--line);border-radius:10px;overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{font-size:12px;color:var(--muted);font-weight:500;text-align:right;padding:12px 14px;background:var(--panel);white-space:nowrap}
+th:first-child{text-align:left}
+th abbr{text-decoration:none;border-bottom:1px dotted var(--dim);cursor:help}
+td{padding:12px 14px;text-align:right;white-space:nowrap;border-top:1px solid var(--line)}
+td:first-child{text-align:left;white-space:normal}
+tbody tr{cursor:pointer}tbody tr:hover{background:#151a20}
+.nm{font-weight:600}
+.sub{display:block;font-size:12px;color:var(--dim);font-weight:400;margin-top:2px}
+.ch{display:inline-flex;align-items:center;gap:8px;justify-content:flex-end}
+.out{display:inline-block;min-width:92px;text-align:center;border-radius:6px;padding:4px 8px;font-size:13px;font-weight:600;font-family:var(--mono)}
+.out.g{background:rgba(62,207,142,.12);color:var(--up)}.out.r{background:rgba(240,97,109,.12);color:var(--dn)}.out.h{background:#1d2229;color:var(--muted)}
+.trade{display:inline-block;font-size:12px;font-weight:600;color:var(--accent);text-decoration:none;border:1px solid #4a3d22;border-radius:6px;padding:4px 9px}
+.trade:hover{background:#2a2316}
+.more{display:flex;justify-content:center;padding:14px}
+.empty{padding:40px;text-align:center;color:var(--muted)}
+@media (max-width:700px){
+  html,body{font-size:15px}
+  .wrap{padding:0 14px}
+  .hd{padding:10px 14px;gap:6px 10px}
+  .hdR{margin-left:0;width:100%;justify-content:space-between;gap:8px;font-size:12px}
+  .hd .btn{min-height:36px;padding:7px 12px}
+  .intro{padding:14px 0 0}
+  .intro h1{font-size:18px;line-height:1.3}
+  .intro p{display:none}
+  .intro .more-info{display:inline}
+  .tabs{margin-top:10px;margin-left:-14px;margin-right:-14px;padding:0 6px;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tabs button,.tabs select{padding:12px 10px;min-height:44px}
+  .tools{gap:8px;padding:12px 0 8px}
+  .search{flex:1 1 100%;font-size:16px;padding:11px 12px}
+  .seg{flex:1 1 100%}
+  .seg button{flex:1 1 0;min-height:44px;padding:8px 4px;font-size:13px}
+  #filtersBtn{flex:1 1 100%}
+  .count{padding:2px 0 8px}
+  .tbl{border:0;border-radius:0;overflow:visible;margin:0 -14px}
+  table,tbody{display:block}
+  thead{display:none}
+  tbody tr{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name price" "name chg" "out trade";column-gap:12px;row-gap:6px;padding:13px 14px;border-top:1px solid var(--line)}
+  tbody tr:last-child{border-bottom:1px solid var(--line)}
+  td{display:block;padding:0;border:0;text-align:right}
+  td.c-name{grid-area:name;text-align:left;min-width:0}
+  td.c-name .nm{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  td.c-price{grid-area:price;font-size:15px}
+  td.c-1h{display:none}
+  td.c-24{grid-area:chg}
+  td.c-out{grid-area:out;text-align:left}
+  td.c-trade{grid-area:trade;display:block}
+  td.c-trade:empty{display:none}
+  td.empty{grid-column:1/-1;text-align:center}
+  .spk{display:none}
+  .out{min-width:0;font-size:12px;padding:3px 8px}
+  .out::before{content:'7-day ';font-weight:500;opacity:.75;font-family:var(--sans)}
+  .trade{padding:6px 10px}
+  .drawer{width:100%;border-left:0;padding:18px 16px 40px}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .x{top:10px;right:10px}
+  footer{padding:20px 0 32px}
+}
+
+/* drawers */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:40}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(520px,100%);background:var(--bg2);border-left:1px solid var(--line);z-index:41;overflow:auto;padding:22px;display:flex;flex-direction:column;gap:16px}
+.drawer h2{margin:0;font-size:20px}
+.x{position:absolute;top:14px;right:14px;min-height:36px}
+.field label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+.field .inp{width:100%;background:var(--panel);border:1px solid var(--line2);border-radius:8px;padding:9px 10px;color:var(--fg)}
+.row2{display:flex;gap:8px}
+.help{font-size:12px;color:var(--dim);margin-top:4px}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px}
+.stat .k{font-size:12px;color:var(--muted)}.stat .v{font-family:var(--mono);font-size:16px;margin-top:3px}
+.chart{position:relative}
+.chart svg{display:block;overflow:visible}
+.chart .tick text{fill:var(--muted);font-size:11px;font-family:var(--sans)}
+.chart .tick line,.chart .domain{stroke:var(--line2)}
+.chart .grid line{stroke:#1d2128}.chart .grid .domain{display:none}
+.tip{position:absolute;pointer-events:none;background:#1b2027;border:1px solid var(--line2);border-radius:6px;padding:6px 8px;font-size:12px;white-space:nowrap;z-index:5}
+footer{color:var(--dim);font-size:12px;line-height:1.6;padding:28px 0 40px}
+footer summary{cursor:pointer;color:var(--muted)}
+.sm-only{display:none}@media (max-width:700px){.sm-only{display:inline}.lg-only{display:none}}
+@media (max-width:700px){.field .inp{font-size:16px;min-height:44px}.drawer .btn,.drawer .btn2{min-height:44px;flex:1}}
+.banner{background:#2a2316;color:var(--accent);font-size:13px;text-align:center;padding:8px}
+</style>
+</head>
+<body>
+<header><div class="wrap hd">
+  <div class="brand">EXILE MARKET <span class="lg" id="league">PoE 1</span></div>
+  <div class="hdR">
+    <span class="div" id="divine">Divine —</span>
+    <span id="stamp">—</span>
+    <button class="btn" id="refresh" type="button">Refresh</button>
+  </div>
+</div></header>
+
+<main class="wrap">
+  <div class="intro">
+    <h1 id="headline">Loading prices…</h1>
+    <p>Prices in chaos from GGG's currency exchange and poe.ninja, updated hourly. The <b>7-day outlook</b> compares each item with the Divine Orb, so general chaos inflation doesn't make everything look like a winner.</p>
+  </div>
+
+  <div class="tabs" role="tablist" aria-label="Market" id="tabs"></div>
+
+  <div class="tools">
+    <input class="search" id="q" type="search" placeholder="Search items" aria-label="Search items" autocomplete="off">
+    <div class="seg" role="group" aria-label="Show" id="dir">
+      <button type="button" data-v="up" aria-pressed="true">Rising</button>
+      <button type="button" data-v="down" aria-pressed="false">Falling</button>
+      <button type="button" data-v="price" aria-pressed="false"><span class="lg-only">Most valuable</span><span class="sm-only">Priciest</span></button>
+    </div>
+    <div class="seg" role="group" aria-label="Over" id="win">
+      <button type="button" data-v="c1" aria-pressed="false"><span class="lg-only">Last hour</span><span class="sm-only">1 hour</span></button>
+      <button type="button" data-v="c24" aria-pressed="true">24 hours</button>
+      <button type="button" data-v="f7" aria-pressed="false"><span class="lg-only">7-day outlook</span><span class="sm-only">7 days</span></button>
+    </div>
+    <button class="btn2" type="button" id="filtersBtn">Filters</button>
+  </div>
+  <div class="count" id="count">—</div>
+
+  <div class="tbl">
+    <table>
+      <thead><tr>
+        <th>Item</th>
+        <th>Price</th>
+        <th><abbr title="Change over the last completed hour">Last hour</abbr></th>
+        <th><abbr title="Change over the last 24 hours, with the hourly trend">24 hours</abbr></th>
+        <th><abbr title="Projected move against the Divine Orb over the next 7 days">7-day outlook</abbr></th>
+        <th><span class="sr" style="position:absolute;width:1px;height:1px;overflow:hidden">Trade</span></th>
+      </tr></thead>
+      <tbody id="tbody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+  <div class="more"><button class="btn2" type="button" id="more" hidden>Show more</button></div>
+
+  <footer>
+    <details><summary>How the numbers work</summary>
+      <p>Hourly prices for currency, fragments, essences and cards come from GGG's currency exchange (Faustus): the volume-weighted rate in the last completed hour. Uniques come from hourly poe.ninja snapshots. The 7-day outlook converts prices to Divines and projects the latest daily momentum forward, fading it each day. "Rising" and "Falling" outlooks mean a projected move of more than 10% against the Divine Orb. Liquidity is how much trades per day (currency) or how many are listed (uniques). This is a short-term trend read, not trading advice.</p>
+    </details>
+    <p>Data: GGG currency exchange and poe.ninja. Not affiliated with Grinding Gear Games or poe.ninja. <a href="https://github.com/Strix-YT/poe-market-trends">Source on GitHub</a> · <a href="../">Classic layout</a></p>
+  </footer>
+</main>
+<div id="host"></div>
+
+<script>
+(() => {
+  const DATA = '../data/';
+  const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const UP = '#3ecf8e', DN = '#f0616d', ACC = '#e8b04a';
+  const fmtC = (v) => v == null || isNaN(v) ? '—' : v >= 100 ? d3.format(',.0f')(v) : v >= 1 ? d3.format(',.2~f')(v) : d3.format('.3~r')(v);
+  const pct = (v) => v == null || isNaN(v) ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + d3.format('.1f')(Math.abs(v)) + '%';
+  const cls = (v) => v == null ? 'dim' : v > 0 ? 'up' : v < 0 ? 'dn' : 'mut';
+  const short = (v) => v == null ? '—' : v >= 1e3 ? d3.format('.3~s')(v) : d3.format(',')(Math.round(v));
+  const el = (tag, attrs = {}, ...kids) => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'class') e.className = v; else if (k === 'text') e.textContent = v; else if (k.startsWith('on')) e.addEventListener(k.slice(2), v); else if (v != null) e.setAttribute(k, v); } kids.flat().forEach((k) => k != null && k !== false && e.append(k)); return e; };
+
+  const TABS = [['all', 'All'], ['Currency', 'Currency'], ['Uniques', 'Uniques'], ['Divination Cards', 'Divination Cards'], ['Fragments', 'Fragments'], ['Essences', 'Essences']];
+  const DEF = { tab: 'all', q: '', dir: 'up', win: 'c24', pmin: '', pmax: '', conf: 'medium', sub: '', links: '' };
+  let S = { ...DEF };
+  try { Object.assign(S, JSON.parse(localStorage.getItem('em-simple') || '{}')); } catch (e) {}
+  const save = () => { try { localStorage.setItem('em-simple', JSON.stringify(S)); } catch (e) {} };
+  let M = null, H = null, shown = 50, ROWS = [];
+
+  const v24 = (i) => i.c24 ?? i.d1;
+  const val = (i, k) => k === 'c24' ? v24(i) : i[k];
+  const liqText = (i) => i.v != null ? short(i.v) + 'c traded/day' : i.ls != null ? i.ls + ' listed' : '';
+  const nFilters = () => ['pmin', 'pmax', 'sub', 'links'].filter((k) => S[k] !== '').length + (S.conf !== DEF.conf ? 1 : 0);
+
+  function inTab(i) {
+    if (S.tab === 'all') return true;
+    if (S.tab === 'Uniques') return i.g === 'Uniques';
+    return i.c === S.tab;
+  }
+  function filtered() {
+    const q = S.q.trim().toLowerCase(), lo = parseFloat(S.pmin), hi = parseFloat(S.pmax);
+    const confOk = (c) => S.conf === 'any' || (S.conf === 'medium' ? c !== 'Low' : c === 'High');
+    return M.items.filter((i) => inTab(i) && confOk(i.conf) && (!q || i.n.toLowerCase().includes(q))
+      && (isNaN(lo) || i.p >= lo) && (isNaN(hi) || i.p <= hi) && (!S.sub || i.s === S.sub) && (S.links === '' || String(i.l || 0) === S.links));
+  }
+  function sorted(rows) {
+    if (S.dir === 'price') return rows.slice().sort((a, b) => b.p - a.p);
+    const k = S.win, sgn = S.dir === 'up' ? 1 : -1;
+    return rows.filter((i) => val(i, k) != null && sgn * val(i, k) > 0).sort((a, b) => sgn * (val(b, k) - val(a, k)));
+  }
+
+  // ------------------------------------------------------------ render
+  function render() {
+    if (!M) return;
+    ROWS = sorted(filtered());
+    $$('#tabs button').forEach((b) => b.setAttribute('aria-selected', b.dataset.v === S.tab));
+    const more = $('#tabs select'); if (more) more.value = TABS.some(([v]) => v === S.tab) ? '' : S.tab;
+    $$('#dir button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === S.dir));
+    $$('#win button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === S.win));
+    $('#win').style.visibility = S.dir === 'price' ? 'hidden' : 'visible';
+    $('#q').value = S.q;
+    const nf = nFilters(); $('#filtersBtn').replaceChildren(...['Filters', nf ? el('span', { class: 'badge', text: nf }) : null].filter(Boolean));
+    const winTxt = { c1: 'in the last hour', c24: 'over 24 hours', f7: 'in the 7-day outlook' }[S.win];
+    const lab = { c1: 'last hour', c24: '24 hours', f7: '7-day outlook' }[S.win];
+    $('#count').textContent = S.dir === 'price' ? `${d3.format(',')(ROWS.length)} items, most valuable first` : `${d3.format(',')(ROWS.length)} items ${S.dir === 'up' ? 'rising' : 'falling'} ${winTxt}`;
+    renderTable();
+  }
+  function spark(arr, w = 64, h = 20) {
+    const pts = (arr || []).map((v, i) => [i, v]).filter((p) => p[1] != null);
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('width', w); svg.setAttribute('height', h); svg.setAttribute('aria-hidden', 'true');
+    if (pts.length < 2) return svg;
+    const x = d3.scaleLinear().domain([0, arr.length - 1]).range([1, w - 1]), y = d3.scaleLinear().domain(d3.extent(pts, (p) => p[1])).range([h - 2, 2]);
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p.setAttribute('d', d3.line().x((d) => x(d[0])).y((d) => y(d[1]))(pts)); p.setAttribute('fill', 'none'); p.setAttribute('stroke', pts[pts.length - 1][1] >= pts[0][1] ? UP : DN); p.setAttribute('stroke-width', '1.5');
+    svg.append(p); return svg;
+  }
+  function outlook(i) {
+    if (i.f7 == null) return el('span', { class: 'out h', text: 'new item' });
+    const c = i.sig === 'Gain' ? 'g' : i.sig === 'Lose' ? 'r' : 'h';
+    return el('span', { class: 'out ' + c, title: i.sig === 'Gain' ? 'Expected to gain value vs Divine' : i.sig === 'Lose' ? 'Expected to lose value vs Divine' : 'Expected to hold steady', text: (i.f7 > 0 ? '▲ ' : i.f7 < 0 ? '▼ ' : '') + pct(i.f7) });
+  }
+  function tradeUrl(i) {
+    if (i.g !== 'Uniques') return null;
+    const name = i.un || i.n.replace(/ \(\dL\)/, '').replace(/ \[.*\]$/, '').replace(/ #\d+$/, '');
+    const query = { status: { option: 'online' }, name }; if (i.b) query.type = i.b;
+    if (i.l) query.filters = { socket_filters: { filters: { links: { min: i.l, max: i.l } } } };
+    return `https://www.pathofexile.com/trade/search/${encodeURIComponent(M.league || 'Standard')}?q=${encodeURIComponent(JSON.stringify({ query }))}`;
+  }
+  function tradeLink(i, label = 'Trade ↗') { const u = tradeUrl(i); if (!u) return null; const a = el('a', { class: 'trade', href: u, target: '_blank', rel: 'noopener noreferrer', title: 'Search on the official trade site', text: label }); a.addEventListener('click', (e) => e.stopPropagation()); return a; }
+  function renderTable() {
+    const tb = $('#tbody');
+    if (!ROWS.length) { tb.replaceChildren(el('tr', {}, el('td', { colspan: 6, class: 'empty', text: 'Nothing matches. Try another tab or clear the filters.' }))); $('#more').hidden = true; return; }
+    tb.replaceChildren(...ROWS.slice(0, shown).map((i) => {
+      const sub = [S.tab === 'all' || S.tab === 'Uniques' ? (i.g === 'Uniques' ? i.s || i.c : i.c) : null, i.l ? i.l + '-link' : null, liqText(i)].filter(Boolean).join(' · ');
+      const tr = el('tr', { tabindex: '0' },
+        el('td', { class: 'c-name' }, el('span', { class: 'nm', text: i.n }), el('span', { class: 'sub', text: sub })),
+        el('td', { class: 'mono c-price', text: fmtC(i.p) + 'c' }),
+        el('td', { class: 'mono c-1h ' + cls(i.c1), text: pct(i.c1) }),
+        el('td', { class: 'c-24' },
+          el('span', { class: 'ch lg-only' }, (() => { const sv = spark(i.sp); sv.classList.add('spk'); return sv; })(), el('span', { class: 'mono ' + cls(v24(i)), style: 'min-width:62px;display:inline-block', title: '24-hour change', text: pct(v24(i)) })),
+          (() => { const k = S.win === 'c1' ? 'c1' : 'c24', v = val(i, k); return el('span', { class: 'sm-only mono ' + cls(v) }, el('span', { class: 'dim', style: 'font-family:var(--sans);font-size:12px', text: k === 'c1' ? '1h ' : '24h ' }), pct(v)); })()),
+        el('td', { class: 'c-out' }, outlook(i)),
+        el('td', { class: 'c-trade' }, tradeLink(i)));
+      tr.addEventListener('click', () => openItem(i)); tr.addEventListener('keydown', (e) => { if (e.key === 'Enter') openItem(i); });
+      return tr;
+    }));
+    $('#more').hidden = ROWS.length <= shown; $('#more').textContent = `Show more (${d3.format(',')(ROWS.length - shown)} more)`;
+  }
+
+  // ------------------------------------------------------------ controls
+  function buildTabs() {
+    const box = $('#tabs'); box.replaceChildren();
+    TABS.forEach(([v, label]) => box.append(el('button', { type: 'button', role: 'tab', 'data-v': v, onclick: () => { S.tab = v; S.sub = ''; S.links = ''; shown = 50; save(); render(); } }, label)));
+    const others = [...new Set(M.items.filter((i) => i.g !== 'Uniques').map((i) => i.c))].filter((c) => !TABS.some(([v]) => v === c)).sort();
+    const sel = el('select', { 'aria-label': 'More categories' }, new Option('More…', ''), ...others.map((c) => new Option(c, c)));
+    sel.addEventListener('change', () => { if (sel.value) { S.tab = sel.value; shown = 50; save(); render(); } });
+    box.append(sel);
+  }
+  $('#q').addEventListener('input', (e) => { S.q = e.target.value; shown = 50; save(); render(); });
+  $$('#dir button').forEach((b) => b.addEventListener('click', () => { S.dir = b.dataset.v; shown = 50; save(); render(); }));
+  $$('#win button').forEach((b) => b.addEventListener('click', () => { S.win = b.dataset.v; shown = 50; save(); render(); }));
+  $('#more').addEventListener('click', () => { shown += 100; renderTable(); });
+
+  let lastFocus = null;
+  function openPanel(node, label) {
+    lastFocus = document.activeElement;
+    const close = el('button', { class: 'btn2 x', type: 'button', 'aria-label': 'Close', text: '✕', onclick: closePanel });
+    const d = el('div', { class: 'drawer', role: 'dialog', 'aria-modal': 'true', 'aria-label': label }, close, node);
+    $('#host').replaceChildren(el('div', { class: 'scrim', onclick: closePanel }), d); document.body.style.overflow = 'hidden'; close.focus(); return d;
+  }
+  function closePanel() { $('#host').replaceChildren(); document.body.style.overflow = ''; if (lastFocus) lastFocus.focus(); }
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#host').children.length) closePanel(); });
+
+  $('#filtersBtn').addEventListener('click', () => {
+    const inp = (id, ph, v) => el('input', { class: 'inp', id, inputmode: 'decimal', placeholder: ph, value: v });
+    const conf = el('select', { class: 'inp', id: 'f-conf' }, new Option('Any — include thinly traded items', 'any'), new Option('Medium or better (recommended)', 'medium'), new Option('High only — the most traded items', 'high')); conf.value = S.conf;
+    const subs = [...new Set(M.items.filter((i) => i.g === 'Uniques' && i.s).map((i) => i.s))].sort();
+    const sub = el('select', { class: 'inp', id: 'f-sub' }, new Option('Any', ''), ...subs.map((s) => new Option(s, s))); sub.value = S.sub;
+    const links = el('select', { class: 'inp', id: 'f-links' }, new Option('Any', ''), new Option('5-link', '5'), new Option('6-link', '6')); links.value = S.links;
+    const body = el('div', { style: 'display:flex;flex-direction:column;gap:18px' },
+      el('h2', { text: 'Filters' }),
+      el('div', { class: 'field' }, el('label', { text: 'Price in chaos' }), el('div', { class: 'row2' }, inp('f-min', 'From', S.pmin), inp('f-max', 'To', S.pmax)), el('div', { class: 'help', text: `1 Divine ≈ ${fmtC(divNow())} chaos` })),
+      el('div', { class: 'field' }, el('label', { for: 'f-conf', text: 'How much it trades' }), conf, el('div', { class: 'help', text: 'Thinly traded items have jumpy, less reliable numbers.' })),
+      el('div', { class: 'field' }, el('label', { for: 'f-sub', text: 'Unique item type' }), sub),
+      el('div', { class: 'field' }, el('label', { for: 'f-links', text: 'Links (uniques)' }), links),
+      el('div', { style: 'display:flex;gap:10px' },
+        el('button', { class: 'btn', type: 'button', text: 'Apply', onclick: () => { S.pmin = $('#f-min').value; S.pmax = $('#f-max').value; S.conf = conf.value; S.sub = sub.value; S.links = links.value; if (S.sub || S.links) S.tab = 'Uniques'; shown = 50; save(); closePanel(); render(); } }),
+        el('button', { class: 'btn2', type: 'button', text: 'Clear', onclick: () => { Object.assign(S, { pmin: '', pmax: '', conf: DEF.conf, sub: '', links: '' }); shown = 50; save(); closePanel(); render(); } })));
+    openPanel(body, 'Filters');
+  });
+
+  // ------------------------------------------------------------ item panel + charts
+  const divNow = () => (M.divine.h || []).filter((x) => x != null).slice(-1)[0];
+  function seriesFor(name) {
+    if (!H) return null; const fx = H.fx || {}, nj = H.nj || {};
+    if (fx.s && fx.s[name] && fx.s[name].filter((x) => x != null).length >= 2) return { src: 'fx', t: fx.t, s: fx.s[name], lo: fx.lo[name], hi: fx.hi[name], v: fx.v[name] };
+    if (nj.s && nj.s[name]) return { src: 'nj', t: nj.t, s: nj.s[name] };
+    return null;
+  }
+  function axisLeftWidth(svg, y) { const t = svg.append('text').attr('class', 'tick').append('tspan').text(fmtC(y.domain()[1])); const w = t.node().getComputedTextLength(); t.node().parentNode.remove(); return Math.ceil(w) + 12; }
+  function lineChart(host, pts, opts) {
+    host.replaceChildren();
+    if (pts.filter((d) => d.p != null).length < 2) { host.append(el('div', { class: 'empty', style: 'padding:20px', text: opts.empty })); return; }
+    const W = Math.max(280, host.clientWidth), Hh = 180, m = { t: 8, r: 10, b: 24, l: 10 };
+    const svg = d3.select(host).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${Hh}`).attr('role', 'img').attr('aria-label', opts.aria);
+    const vals = pts.flatMap((d) => [d.p, d.lo, d.hi]).filter((x) => x != null);
+    const y = d3.scaleLinear().domain(opts.zero ? [0, d3.max(vals) * 1.05] : d3.extent(vals)).nice(4); m.l = axisLeftWidth(svg, y);
+    const x = d3.scaleUtc().domain(d3.extent(pts, (d) => d.t)).range([m.l, W - m.r]); y.range([Hh - m.b, m.t]);
+    svg.append('g').attr('class', 'grid').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickSize(-(W - m.l - m.r)).tickFormat(''));
+    svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickFormat(fmtC)).call((g) => g.select('.domain').remove());
+    svg.append('g').attr('transform', `translate(0,${Hh - m.b})`).call(d3.axisBottom(x).ticks(W < 450 ? 4 : 6).tickFormat(opts.tf));
+    const band = pts.filter((d) => d.lo != null && d.hi != null);
+    if (band.length > 1) svg.append('path').datum(band).attr('fill', 'rgba(232,176,74,.16)').attr('d', d3.area().x((d) => x(d.t)).y0((d) => y(d.lo)).y1((d) => y(d.hi)));
+    const line = d3.line().defined((d) => d.p != null).x((d) => x(d.t)).y((d) => y(d.p));
+    svg.append('path').datum(pts.filter((d) => !d.fc)).attr('fill', 'none').attr('stroke', ACC).attr('stroke-width', 2).attr('d', line);
+    const fc = pts.filter((d) => d.fc || d.joint); if (fc.length > 1) svg.append('path').datum(fc).attr('fill', 'none').attr('stroke', ACC).attr('stroke-width', 1.8).attr('stroke-dasharray', '5 4').attr('d', line);
+    const tip = d3.select(host).append('div').attr('class', 'tip').style('display', 'none'); const dot = svg.append('circle').attr('r', 4).attr('fill', ACC).style('display', 'none');
+    const ok = pts.filter((d) => d.p != null);
+    svg.append('rect').attr('x', m.l).attr('width', W - m.l - m.r).attr('height', Hh).attr('fill', 'transparent')
+      .on('pointermove', (ev) => { const [mx] = d3.pointer(ev); const d = ok.reduce((a, b) => Math.abs(x(b.t) - mx) < Math.abs(x(a.t) - mx) ? b : a);
+        dot.style('display', null).attr('cx', x(d.t)).attr('cy', y(d.p)); tip.style('display', null).text(`${opts.tipDate(d.t)}${d.fc ? ' (forecast)' : ''}: ${fmtC(d.p)}c`);
+        const tw = tip.node().offsetWidth, sx = x(d.t) / W * host.clientWidth; tip.style('left', Math.max(0, Math.min(host.clientWidth - tw, sx - tw / 2)) + 'px').style('top', '0px'); })
+      .on('pointerleave', () => { tip.style('display', 'none'); dot.style('display', 'none'); });
+  }
+  function openItem(i) {
+    const sr = seriesFor(i.n);
+    const stat = (k, v, c) => el('div', { class: 'stat' }, el('div', { class: 'k', text: k }), el('div', { class: 'v ' + (c || ''), text: v }));
+    const hourHost = el('div', { class: 'chart', style: 'min-height:180px' }), dayHost = el('div', { class: 'chart', style: 'min-height:180px' });
+    const node = el('div', { style: 'display:flex;flex-direction:column;gap:16px' },
+      el('div', {}, el('div', { class: 'mut', style: 'font-size:13px', text: [i.g === 'Uniques' ? i.s : i.c, i.l ? i.l + '-link' : null].filter(Boolean).join(' · ') }), el('h2', { text: i.n }),
+        el('div', { class: 'mono', style: 'font-size:28px;margin-top:6px' }, fmtC(i.p) + 'c ', el('span', { class: 'mut', style: 'font-size:14px', text: `≈ ${fmtC(i.dv)} Divine` })),
+        tradeLink(i, 'Search on official trade ↗') ? el('div', { style: 'margin-top:10px' }, tradeLink(i, 'Search on official trade ↗')) : null),
+      el('div', { class: 'stats' }, stat('Last hour', pct(i.c1), cls(i.c1)), stat('24 hours', pct(v24(i)), cls(v24(i))), stat('7-day outlook', pct(i.f7), cls(i.f7)),
+        stat('Since first traded', pct(i.chg), cls(i.chg)), stat('Trades', i.v != null ? short(i.v) + 'c/day' : i.ls != null ? i.ls + ' listed' : '—'), stat('Confidence', i.conf)),
+      el('section', {}, el('h3', { style: 'font-size:15px;margin:0 0 6px', text: 'Last 48 hours' }), hourHost),
+      el('section', {}, el('h3', { style: 'font-size:15px;margin:0 0 6px', text: 'Daily, with 7-day outlook (dashed)' }), dayHost));
+    openPanel(node, i.n);
+    requestAnimationFrame(() => {
+      const hp = sr ? sr.t.map((t, k) => ({ t: new Date(t), p: sr.s[k], lo: sr.lo ? sr.lo[k] : null, hi: sr.hi ? sr.hi[k] : null })) : [];
+      lineChart(hourHost, hp, { aria: i.n + ' hourly price', empty: H ? 'Hourly history is still building for this item.' : 'Loading…', tf: d3.utcFormat('%H:%M'), tipDate: d3.utcFormat('%-d %b %H:00 UTC') });
+      const P = d3.utcParse('%Y-%m-%d'); const act = i.h.map((p, k) => ({ t: P(M.days[k]), p })).filter((d) => d.p != null);
+      const last = act[act.length - 1]; const fc = i.f.map((p, k) => ({ t: P(M.fdays[k]), p, fc: true })).filter((d) => d.p != null);
+      lineChart(dayHost, [...act, ...(last ? [{ ...last, joint: true }] : []), ...fc], { aria: i.n + ' daily price and outlook', empty: 'Not enough daily history yet.', zero: true, tf: d3.utcFormat('%-d %b'), tipDate: d3.utcFormat('%-d %b') });
+    });
+  }
+
+  // ------------------------------------------------------------ data
+  function header() {
+    const d = M.divine; $('#league').textContent = (M.league || '') + ' · PoE 1';
+    $('#divine').replaceChildren('Divine ', el('b', { text: fmtC(divNow()) + 'c' }), ' ', el('span', { class: cls(d.c24), text: d.c24 != null ? pct(d.c24) + ' today' : '' }));
+    const g = new Date(M.generatedAt), mins = Math.round((Date.now() - g) / 60000);
+    $('#stamp').textContent = `Updated ${mins < 60 ? mins + ' min' : Math.round(mins / 60) + ' h'} ago`;
+    const ups = M.items.filter((i) => i.conf !== 'Low' && i.sig === 'Gain').length, downs = M.items.filter((i) => i.conf !== 'Low' && i.sig === 'Lose').length;
+    $('#headline').textContent = `${d3.format(',')(ups)} items look set to rise this week, ${d3.format(',')(downs)} to fall`;
+  }
+  async function load() {
+    const j = await fetch(DATA + 'market.json?t=' + Date.now(), { cache: 'no-store' }).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    const changed = !M || M.generatedAt !== j.generatedAt; M = j;
+    if (!$('#tabs').children.length) buildTabs();
+    header(); render();
+    if (changed) fetch(DATA + 'hourly.json?t=' + Date.now(), { cache: 'no-store' }).then((r) => r.json()).then((h) => { H = h; }).catch(() => {});
+    return changed;
+  }
+  $('#refresh').addEventListener('click', async (e) => {
+    const b = e.currentTarget; b.disabled = true; b.textContent = 'Refreshing…';
+    try { const c = await load(); b.textContent = c ? 'Updated ✓' : 'Up to date'; } catch (err) { b.textContent = 'Try again'; }
+    setTimeout(() => { b.disabled = false; b.textContent = 'Refresh'; }, 2500);
+  });
+  load().catch(() => { $('#tbody').replaceChildren(el('tr', {}, el('td', { colspan: 6, class: 'empty', text: 'Could not load market data.' }))); });
+})();
+</script>
+</body>
+</html>

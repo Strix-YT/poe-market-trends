@@ -3,414 +3,511 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Exile Market · PoE price tracker</title>
-<meta name="description" content="Path of Exile market tracker: currency, cards, fragments and uniques with hourly moves and 7-day outlooks, from GGG's currency exchange and poe.ninja.">
+<title>Exile Market · PoE price terminal</title>
+<meta name="description" content="Hourly Path of Exile market terminal: currency, fragments, cards and uniques with 1h/24h moves and 7-day forecasts, from GGG's currency exchange and poe.ninja.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <style>
-:root{--bg:#0d0f12;--bg2:#111419;--panel:#14181d;--panel2:#1a1f26;--line:#22272e;--line2:#2d333c;--fg:#e8eaed;--fg2:#c4c9d1;--muted:#8b93a1;--dim:#5d6573;--accent:#e8b04a;--up:#3ecf8e;--dn:#f0616d;--mono:'JetBrains Mono',ui-monospace,monospace;--sans:Inter,system-ui,-apple-system,'Segoe UI',sans-serif}
+:root{--bg:#0d0f12;--bg2:#111419;--panel:#13171c;--panel2:#171b21;--line:#23272e;--line2:#2b3039;--fg:#e6e8eb;--fg2:#c9ced6;--muted:#8b93a1;--dim:#5d6573;--accent:#e8b04a;--accent2:#f5c770;--up:#3ecf8e;--dn:#f0616d;--mono:'JetBrains Mono',ui-monospace,monospace;--sans:Inter,system-ui,-apple-system,'Segoe UI',sans-serif}
 *{box-sizing:border-box}
-html,body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px}
-a{color:var(--accent)}
+html,body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:14px}
+a{color:var(--accent)}a:hover{color:var(--accent2)}
 button,input,select{font:inherit;color:inherit}
 .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .up{color:var(--up)}.dn{color:var(--dn)}.mut{color:var(--muted)}.dim{color:var(--dim)}
-.wrap{max-width:1100px;margin:0 auto;padding:0 20px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 
-/* header */
-header{border-bottom:1px solid var(--line);background:var(--bg2)}
-.hd{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 20px}
-.brand{font-weight:700;letter-spacing:.02em;display:flex;align-items:center;gap:8px}
-.lg{font-size:12px;color:var(--muted);border:1px solid var(--line2);border-radius:4px;padding:2px 7px;font-weight:500}
-.hdR{margin-left:auto;display:flex;align-items:center;gap:14px;font-size:13px;color:var(--muted);flex-wrap:wrap}
-.div b{color:var(--fg);font-family:var(--mono)}
-.btn{background:var(--accent);color:#0d0f12;border:0;border-radius:8px;padding:9px 16px;font-weight:600;cursor:pointer;min-height:40px}
-.btn:disabled{opacity:.6}
-.btn2{background:var(--panel2);color:var(--fg2);border:1px solid var(--line2);border-radius:8px;padding:9px 14px;cursor:pointer;min-height:40px}
+/* top bar */
+.top{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px;padding:10px 20px;border-bottom:1px solid var(--line);background:var(--bg2)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.02em}
+.chip{font-family:var(--mono);font-size:12px;color:var(--muted);border:1px solid var(--line2);border-radius:4px;padding:2px 6px}
+.ticker{display:flex;gap:18px;font-family:var(--mono);font-size:13px;flex:1 1 380px;flex-wrap:wrap;min-width:0}
+.ticker span{white-space:nowrap}
+.ticker b{color:var(--fg);font-weight:600}
+.topR{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted)}
+.btn{background:var(--accent);color:#0d0f12;border:0;border-radius:6px;padding:8px 14px;font-weight:600;min-height:36px;cursor:pointer}
+.btn:disabled{opacity:.6;cursor:default}
+.btn2{background:var(--panel2);color:var(--fg2);border:1px solid var(--line2);border-radius:6px;padding:7px 12px;cursor:pointer}
+#refreshMsg{max-width:260px}
 
-/* intro + tabs */
-.intro{padding:22px 0 6px}
-.intro h1{font-size:22px;margin:0 0 6px}
-.intro p{margin:0;color:var(--muted);font-size:14px;line-height:1.5}
-.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-top:18px;overflow-x:auto}
-.tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:12px 14px;color:var(--muted);cursor:pointer;white-space:nowrap;font-weight:500}
-.tabs button[aria-selected=true]{color:var(--fg);border-bottom-color:var(--accent)}
-.tabs select{background:none;border:0;color:var(--muted);padding:12px 10px;cursor:pointer;width:auto;max-width:180px}
+/* layout */
+.wrap{display:flex;flex-wrap:wrap}
+aside{flex:1 1 250px;max-width:270px;border-right:1px solid var(--line);padding:18px;display:flex;flex-direction:column;gap:18px;background:#0f1216}
+main{flex:999 1 640px;min-width:0;padding:18px 22px 40px;display:flex;flex-direction:column;gap:16px}
+@media (max-width:900px){aside{max-width:none;border-right:0;border-bottom:1px solid var(--line);padding:12px 18px}.top{position:static}}
+.fin{display:flex;flex-direction:column;gap:18px}
+.fsum{cursor:pointer;font-weight:600;padding:4px 0;list-style:none}.fsum::before{content:'▸ ';color:var(--accent)}details[open]>.fsum::before{content:'▾ '}
+@media (min-width:901px){.fsum{display:none}}
+#fbox[open] .fin{margin-top:10px}@media (min-width:901px){#fbox[open] .fin{margin-top:0}}
+.lab{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;display:block}
+.inp{width:100%;background:var(--panel2);border:1px solid var(--line2);color:var(--fg);border-radius:6px;padding:8px 10px}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pill{font-size:12px;background:var(--panel2);color:var(--fg2);border:1px solid var(--line2);border-radius:999px;padding:5px 11px;cursor:pointer}
+.pill[aria-pressed=true]{background:var(--accent);color:#0d0f12;border-color:var(--accent);font-weight:600}
+.tag{font-size:12px;border:1px solid var(--line2);color:var(--muted);border-radius:4px;padding:3px 8px;cursor:pointer;background:transparent}
+.tag[aria-pressed=true].g{border-color:var(--up);color:var(--up)}
+.tag[aria-pressed=true].r{border-color:var(--dn);color:var(--dn)}
+.tag[aria-pressed=true].a{border-color:var(--accent);color:var(--accent)}
+.cats{display:flex;flex-direction:column;gap:5px;max-height:260px;overflow:auto;padding-right:4px}
+.cats label{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--fg2);cursor:pointer}
+.cats .n{margin-left:auto;color:var(--dim);font-family:var(--mono);font-size:11px}
+.row2{display:flex;gap:6px}
+.linkbtn{background:none;border:0;color:var(--accent);cursor:pointer;padding:0;font-size:12px}
 
-/* toolbar */
-.tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:16px 0}
-.search{flex:1 1 220px;background:var(--panel);border:1px solid var(--line2);border-radius:8px;padding:10px 12px;color:var(--fg)}
-.seg{display:flex;background:var(--panel);border:1px solid var(--line2);border-radius:8px;overflow:hidden}
-.seg button{background:none;border:0;padding:9px 13px;color:var(--fg2);cursor:pointer;font-size:14px}
+/* kpis */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px}
+.kpi .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.kpi .v{font-family:var(--mono);font-size:24px;font-weight:600;margin-top:6px}
+.kpi .s{font-size:12px;color:var(--muted);margin-top:4px}
+
+/* toolbar + table */
+.bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.seg{display:flex;background:var(--panel2);border:1px solid var(--line2);border-radius:6px;overflow:hidden;font-size:12px}
+.seg button{background:transparent;border:0;color:var(--fg2);padding:6px 12px;cursor:pointer}
 .seg button[aria-pressed=true]{background:var(--accent);color:#0d0f12;font-weight:600}
-.badge{display:inline-block;background:var(--accent);color:#0d0f12;border-radius:999px;font-size:11px;font-weight:700;padding:1px 7px;margin-left:6px}
-.count{font-size:13px;color:var(--muted);padding:0 0 10px}
+.tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{background:var(--panel);color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:500;padding:10px 12px;text-align:right;white-space:nowrap;cursor:pointer;user-select:none;position:sticky;top:0}
+thead th:first-child,thead th:nth-child(2){text-align:left}
+thead th[aria-sort=descending]::after{content:" ↓"}thead th[aria-sort=ascending]::after{content:" ↑"}
+tbody tr{border-top:1px solid #1d2128;cursor:pointer}
+tbody tr:hover{background:#151a20}
+tbody td{padding:8px 12px;text-align:right;white-space:nowrap}
+tbody td:first-child,tbody td:nth-child(2){text-align:left}
+td.nm{font-weight:500;max-width:340px;overflow:hidden;text-overflow:ellipsis}
+td.nm small{display:block;color:var(--dim);font-weight:400;font-size:11px}
+.trade{display:inline-block;font-size:11px;font-weight:600;color:var(--accent);text-decoration:none;border:1px solid #4a3d22;border-radius:4px;padding:3px 8px;white-space:nowrap}.trade:hover{background:#2a2316;color:var(--accent2)}
+.sig{font-size:11px;border:1px solid currentColor;border-radius:4px;padding:1px 6px}
+.more{display:flex;justify-content:center;padding:6px}
 
-/* table */
-.tbl{border:1px solid var(--line);border-radius:10px;overflow-x:auto}
-table{width:100%;border-collapse:collapse}
-th{font-size:12px;color:var(--muted);font-weight:500;text-align:right;padding:12px 14px;background:var(--panel);white-space:nowrap}
-th:first-child{text-align:left}
-th abbr{text-decoration:none;border-bottom:1px dotted var(--dim);cursor:help}
-td{padding:12px 14px;text-align:right;white-space:nowrap;border-top:1px solid var(--line)}
-td:first-child{text-align:left;white-space:normal}
-tbody tr{cursor:pointer}tbody tr:hover{background:#151a20}
-.nm{font-weight:600}
-.sub{display:block;font-size:12px;color:var(--dim);font-weight:400;margin-top:2px}
-.ch{display:inline-flex;align-items:center;gap:8px;justify-content:flex-end}
-.out{display:inline-block;min-width:92px;text-align:center;border-radius:6px;padding:4px 8px;font-size:13px;font-weight:600;font-family:var(--mono)}
-.out.g{background:rgba(62,207,142,.12);color:var(--up)}.out.r{background:rgba(240,97,109,.12);color:var(--dn)}.out.h{background:#1d2229;color:var(--muted)}
-.trade{display:inline-block;font-size:12px;font-weight:600;color:var(--accent);text-decoration:none;border:1px solid #4a3d22;border-radius:6px;padding:4px 9px}
-.trade:hover{background:#2a2316}
-.more{display:flex;justify-content:center;padding:14px}
-.empty{padding:40px;text-align:center;color:var(--muted)}
-@media (max-width:700px){
-  html,body{font-size:15px}
-  .wrap{padding:0 14px}
-  .hd{padding:10px 14px;gap:6px 10px}
-  .hdR{margin-left:0;width:100%;justify-content:space-between;gap:8px;font-size:12px}
-  .hd .btn{min-height:36px;padding:7px 12px}
-  .intro{padding:14px 0 0}
-  .intro h1{font-size:18px;line-height:1.3}
-  .intro p{display:none}
-  .intro .more-info{display:inline}
-  .tabs{margin-top:10px;margin-left:-14px;margin-right:-14px;padding:0 6px;scrollbar-width:none}
-  .tabs::-webkit-scrollbar{display:none}
-  .tabs button,.tabs select{padding:12px 10px;min-height:44px}
-  .tools{gap:8px;padding:12px 0 8px}
-  .search{flex:1 1 100%;font-size:16px;padding:11px 12px}
-  .seg{flex:1 1 100%}
-  .seg button{flex:1 1 0;min-height:44px;padding:8px 4px;font-size:13px}
-  #filtersBtn{flex:1 1 100%}
-  .count{padding:2px 0 8px}
-  .tbl{border:0;border-radius:0;overflow:visible;margin:0 -14px}
-  table,tbody{display:block}
-  thead{display:none}
-  tbody tr{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name price" "name chg" "out trade";column-gap:12px;row-gap:6px;padding:13px 14px;border-top:1px solid var(--line)}
-  tbody tr:last-child{border-bottom:1px solid var(--line)}
-  td{display:block;padding:0;border:0;text-align:right}
-  td.c-name{grid-area:name;text-align:left;min-width:0}
-  td.c-name .nm{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  td.c-price{grid-area:price;font-size:15px}
-  td.c-1h{display:none}
-  td.c-24{grid-area:chg}
-  td.c-out{grid-area:out;text-align:left}
-  td.c-trade{grid-area:trade;display:block}
-  td.c-trade:empty{display:none}
-  td.empty{grid-column:1/-1;text-align:center}
-  .spk{display:none}
-  .out{min-width:0;font-size:12px;padding:3px 8px}
-  .out::before{content:'7-day ';font-weight:500;opacity:.75;font-family:var(--sans)}
-  .trade{padding:6px 10px}
-  .drawer{width:100%;border-left:0;padding:18px 16px 40px}
-  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .x{top:10px;right:10px}
-  footer{padding:20px 0 32px}
-}
-
-/* drawers */
-.scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:40}
-.drawer{position:fixed;top:0;right:0;bottom:0;width:min(520px,100%);background:var(--bg2);border-left:1px solid var(--line);z-index:41;overflow:auto;padding:22px;display:flex;flex-direction:column;gap:16px}
-.drawer h2{margin:0;font-size:20px}
-.x{position:absolute;top:14px;right:14px;min-height:36px}
-.field label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
-.field .inp{width:100%;background:var(--panel);border:1px solid var(--line2);border-radius:8px;padding:9px 10px;color:var(--fg)}
-.row2{display:flex;gap:8px}
-.help{font-size:12px;color:var(--dim);margin-top:4px}
-.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-.stat{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px}
-.stat .k{font-size:12px;color:var(--muted)}.stat .v{font-family:var(--mono);font-size:16px;margin-top:3px}
+/* panels */
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;position:relative}
+.panel h3{margin:0 0 2px;font-size:14px}
+.panel .cap{font-size:12px;color:var(--muted);margin:0 0 10px}
+.heat{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px}
+.heat button{border:0;border-radius:6px;padding:10px 8px;text-align:left;cursor:pointer;color:#0d0f12;font-weight:600;font-size:12px;min-height:52px}
+.heat button span{display:block;font-family:var(--mono);font-weight:500;margin-top:2px}
 .chart{position:relative}
 .chart svg{display:block;overflow:visible}
 .chart .tick text{fill:var(--muted);font-size:11px;font-family:var(--sans)}
 .chart .tick line,.chart .domain{stroke:var(--line2)}
 .chart .grid line{stroke:#1d2128}.chart .grid .domain{display:none}
-.tip{position:absolute;pointer-events:none;background:#1b2027;border:1px solid var(--line2);border-radius:6px;padding:6px 8px;font-size:12px;white-space:nowrap;z-index:5}
-footer{color:var(--dim);font-size:12px;line-height:1.6;padding:28px 0 40px}
-footer summary{cursor:pointer;color:var(--muted)}
-.sm-only{display:none}@media (max-width:700px){.sm-only{display:inline}.lg-only{display:none}}
-@media (max-width:700px){.field .inp{font-size:16px;min-height:44px}.drawer .btn,.drawer .btn2{min-height:44px;flex:1}}
-.banner{background:#2a2316;color:var(--accent);font-size:13px;text-align:center;padding:8px}
+.tip{position:absolute;pointer-events:none;background:#1b2027;border:1px solid var(--line2);border-radius:6px;padding:6px 8px;font-size:12px;white-space:nowrap;z-index:5;box-shadow:0 6px 18px rgba(0,0,0,.4)}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted);flex-wrap:wrap;margin-bottom:6px}
+.sw{display:inline-block;width:16px;height:0;border-top:2px solid var(--accent);vertical-align:middle;margin-right:5px}
+.sw.d{border-top-style:dashed}.sw.b{height:10px;border:0;background:#2b3039;width:10px}.sw.band{height:10px;border:0;background:rgba(232,176,74,.18);width:14px}
+
+/* drawer */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:40}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(560px,100%);background:var(--bg2);border-left:1px solid var(--line);z-index:41;overflow:auto;padding:20px 22px 40px;display:flex;flex-direction:column;gap:14px}
+.drawer h2{margin:0;font-size:20px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px}
+.stat .k{font-size:11px;color:var(--muted)}.stat .v{font-family:var(--mono);font-size:16px;margin-top:3px}.stat .v.t{font-family:var(--sans);font-size:14px;font-weight:600}
+.x{position:absolute;top:14px;right:14px}
+footer{padding:0 22px 40px;color:var(--muted);font-size:12px;line-height:1.6;max-width:1100px}
+footer details{margin-top:6px}
+.empty{padding:30px;text-align:center;color:var(--muted)}
+.skel{color:var(--dim)}
 </style>
 </head>
 <body>
-<header><div class="wrap hd">
-  <div class="brand">EXILE MARKET <span class="lg" id="league">PoE 1</span></div>
-  <div class="hdR">
-    <span class="div" id="divine">Divine —</span>
+<header class="top">
+  <div class="brand">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#e8b04a" stroke-width="2" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>
+    <span>EXILE MARKET</span><span class="chip" id="leagueChip">PoE 1</span>
+  </div>
+  <div class="ticker" id="ticker"><span class="skel">Loading prices…</span></div>
+  <div class="topR">
     <span id="stamp">—</span>
-    <button class="btn" id="refresh" type="button">Refresh</button>
+    <button class="btn" id="refresh" type="button" title="Load the newest prices the hourly job has published">↻ Refresh</button>
   </div>
-</div></header>
+  <span id="refreshMsg" class="mut" role="status" style="font-size:12px"></span>
+</header>
 
-<main class="wrap">
-  <div class="intro">
-    <h1 id="headline">Loading prices…</h1>
-    <p>Prices in chaos from GGG's currency exchange and poe.ninja, updated hourly. The <b>7-day outlook</b> compares each item with the Divine Orb, so general chaos inflation doesn't make everything look like a winner.</p>
-  </div>
-
-  <div class="tabs" role="tablist" aria-label="Market" id="tabs"></div>
-
-  <div class="tools">
-    <input class="search" id="q" type="search" placeholder="Search items" aria-label="Search items" autocomplete="off">
-    <div class="seg" role="group" aria-label="Show" id="dir">
-      <button type="button" data-v="up" aria-pressed="true">Rising</button>
-      <button type="button" data-v="down" aria-pressed="false">Falling</button>
-      <button type="button" data-v="price" aria-pressed="false"><span class="lg-only">Most valuable</span><span class="sm-only">Priciest</span></button>
+<div class="wrap">
+  <aside aria-label="Filters">
+    <details id="fbox" open><summary class="fsum">Filters</summary><div class="fin">
+    <div><label class="lab" for="q">Search</label><input id="q" class="inp" type="search" placeholder="Item name…" autocomplete="off"></div>
+    <div><span class="lab">Market</span>
+      <div class="pills" id="market">
+        <button class="pill" type="button" data-v="all" aria-pressed="true">All</button>
+        <button class="pill" type="button" data-v="Exchange" aria-pressed="false">Currency &amp; exchange</button>
+        <button class="pill" type="button" data-v="Uniques" aria-pressed="false">Uniques</button>
+      </div>
     </div>
-    <div class="seg" role="group" aria-label="Over" id="win">
-      <button type="button" data-v="c1" aria-pressed="false"><span class="lg-only">Last hour</span><span class="sm-only">1 hour</span></button>
-      <button type="button" data-v="c24" aria-pressed="true">24 hours</button>
-      <button type="button" data-v="f7" aria-pressed="false"><span class="lg-only">7-day outlook</span><span class="sm-only">7 days</span></button>
+    <div><span class="lab">Category <button class="linkbtn" type="button" id="catAll">all</button> · <button class="linkbtn" type="button" id="catNone">none</button></span>
+      <div class="cats" id="cats"></div>
     </div>
-    <button class="btn2" type="button" id="filtersBtn">Filters</button>
-  </div>
-  <div class="count" id="count">—</div>
+    <div id="uniqueBox" hidden>
+      <label class="lab" for="sub">Unique item type</label>
+      <select id="sub" class="inp"><option value="">Any type</option></select>
+      <label class="lab" for="links" style="margin-top:10px">Links</label>
+      <select id="links" class="inp"><option value="">Any</option><option value="5">5-link</option><option value="6">6-link</option><option value="0">Unlinked</option></select>
+    </div>
+    <div><span class="lab">Price (chaos)</span>
+      <div class="row2"><input id="pmin" class="inp" inputmode="decimal" placeholder="min" aria-label="Minimum price"><input id="pmax" class="inp" inputmode="decimal" placeholder="max" aria-label="Maximum price"></div>
+    </div>
+    <div><span class="lab">7-day signal</span>
+      <div class="pills" id="sig">
+        <button class="tag g" type="button" data-v="Gain" aria-pressed="true">Gain</button>
+        <button class="tag a" type="button" data-v="Hold" aria-pressed="true">Hold</button>
+        <button class="tag r" type="button" data-v="Lose" aria-pressed="true">Lose</button>
+        <button class="tag a" type="button" data-v="New" aria-pressed="true">New</button>
+      </div>
+    </div>
+    <div><span class="lab">Confidence</span>
+      <div class="pills" id="conf">
+        <button class="tag a" type="button" data-v="High" aria-pressed="true">High</button>
+        <button class="tag a" type="button" data-v="Medium" aria-pressed="true">Medium</button>
+        <button class="tag a" type="button" data-v="Low" aria-pressed="false">Low</button>
+      </div>
+    </div>
+    <div><label style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--fg2);cursor:pointer"><input type="checkbox" id="fxOnly"> Only items with Faustus hourly trades</label></div>
+    <button class="btn2" type="button" id="reset">Reset filters</button>
+    </div></details>
+  </aside>
 
-  <div class="tbl">
-    <table>
-      <thead><tr>
-        <th>Item</th>
-        <th>Price</th>
-        <th><abbr title="Change over the last completed hour">Last hour</abbr></th>
-        <th><abbr title="Change over the last 24 hours, with the hourly trend">24 hours</abbr></th>
-        <th><abbr title="Projected move against the Divine Orb over the next 7 days">7-day outlook</abbr></th>
-        <th><span class="sr" style="position:absolute;width:1px;height:1px;overflow:hidden">Trade</span></th>
-      </tr></thead>
-      <tbody id="tbody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
-    </table>
-  </div>
-  <div class="more"><button class="btn2" type="button" id="more" hidden>Show more</button></div>
+  <main>
+    <section class="kpis" id="kpis" aria-label="Key figures"></section>
 
-  <footer>
-    <details><summary>How the numbers work</summary>
-      <p>Hourly prices for currency, fragments, essences and cards come from GGG's currency exchange (Faustus): the volume-weighted rate in the last completed hour. Uniques come from hourly poe.ninja snapshots. The 7-day outlook converts prices to Divines and projects the latest daily momentum forward, fading it each day. "Rising" and "Falling" outlooks mean a projected move of more than 10% against the Divine Orb. Liquidity is how much trades per day (currency) or how many are listed (uniques). This is a short-term trend read, not trading advice.</p>
-    </details>
-    <p>Data: GGG currency exchange and poe.ninja. Not affiliated with Grinding Gear Games or poe.ninja. <a href="https://github.com/Strix-YT/poe-market-trends">Source on GitHub</a> · <a href="classic/">Classic layout</a></p>
-  </footer>
-</main>
-<div id="host"></div>
+    <div class="grid2">
+      <section class="panel">
+        <h3>Divine Orb · hourly</h3>
+        <p class="cap">Chaos per Divine on Faustus, last 48 hours: line = volume-weighted price, band = low–high rate, bars = Chaos traded</p>
+        <div class="chart" id="divChart" style="min-height:200px"></div>
+      </section>
+      <section class="panel">
+        <h3>Category heat · <span id="heatLab">24h</span></h3>
+        <p class="cap">Median move per category in the current window. Click a tile to filter.</p>
+        <div class="heat" id="heat"></div>
+      </section>
+    </div>
+    <div class="bar">
+      <strong>Movers</strong>
+      <div class="seg" id="period" role="group" aria-label="Change window">
+        <button type="button" data-v="c1" aria-pressed="true">1h</button>
+        <button type="button" data-v="c6" aria-pressed="false">6h</button>
+        <button type="button" data-v="c24" aria-pressed="false">24h</button>
+        <button type="button" data-v="f7" aria-pressed="false">7d fcst</button>
+      </div>
+      <div class="seg" id="dir" role="group" aria-label="Direction">
+        <button type="button" data-v="abs" aria-pressed="true">Biggest</button>
+        <button type="button" data-v="up" aria-pressed="false">Risers</button>
+        <button type="button" data-v="down" aria-pressed="false">Fallers</button>
+      </div>
+      <span class="dim" id="count" style="margin-left:auto;font-size:12px">—</span>
+    </div>
+
+    <div class="tblwrap">
+      <table>
+        <thead><tr>
+          <th data-k="n">Item</th><th data-k="c">Type</th><th data-k="p">Price</th><th data-k="c1">1h</th>
+          <th data-k="sp" style="cursor:default;text-align:center">Last 24h</th><th data-k="c24">24h</th>
+          <th data-k="f7">7d fcst</th><th data-k="sig">Signal</th><th data-k="liq">Liquidity</th><th style="cursor:default;text-align:center">Trade</th>
+        </tr></thead>
+        <tbody id="tbody"><tr><td colspan="10" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="more"><button class="btn2" type="button" id="moreBtn" hidden>Show more</button></div>
+
+  </main>
+</div>
+
+<footer>
+  <div>Data: <a href="https://www.pathofexile.com/developer/docs/reference#currencyexchange">GGG currency exchange (Faustus)</a> for hourly trades, and <a href="https://poe.ninja">poe.ninja</a> for daily history, Uniques and Divination Cards. Refreshed hourly by a GitHub Actions job. Not affiliated with Grinding Gear Games or poe.ninja. Source: <a href="https://github.com/Strix-YT/poe-market-trends">github.com/Strix-YT/poe-market-trends</a> · <a href="simple/">Simple layout</a></div>
+  <details>
+    <summary>How the numbers work</summary>
+    <p><b>Hourly (1h, 6h, 24h):</b> for currency-exchange items, each hour's price is the volume-weighted average rate on Faustus for the last completed hour (GGG publishes each hour once it ends, so the newest point is up to an hour old). Uniques and cards aren't traded on Faustus, so their hourly moves come from hourly poe.ninja snapshots. Where hourly history is too short, 24h falls back to poe.ninja's daily change.</p>
+    <p><b>7-day forecast:</b> prices are converted to Divines, then a damped-momentum model projects the latest daily moves forward (75% of the last day's change plus 25% of the day before, shrinking 45% a day, capped at roughly ±80% a day). Gain or Lose means a projected move beyond ±10% in Divines. Confidence follows liquidity: currency by Chaos traded per day (High ≥ 20,000c, Medium ≥ 3,000c), Uniques by trade listings (High ≥ 100, Medium ≥ 25).</p>
+    <p>This is a short-term momentum read, not trading advice. Patches, new strategies and meta shifts move prices in ways no trend line can see.</p>
+  </details>
+</footer>
+
+<div id="drawerHost"></div>
 
 <script>
 (() => {
-  const DATA = 'data/';
-  const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const UP = '#3ecf8e', DN = '#f0616d', ACC = '#e8b04a';
-  const fmtC = (v) => v == null || isNaN(v) ? '—' : v >= 100 ? d3.format(',.0f')(v) : v >= 1 ? d3.format(',.2~f')(v) : d3.format('.3~r')(v);
+  const fmtC = (v) => v == null || isNaN(v) ? '—' : v >= 1000 ? d3.format(',.0f')(v) : v >= 100 ? d3.format(',.0f')(v) : v >= 1 ? d3.format(',.2~f')(v) : d3.format('.3~r')(v);
   const pct = (v) => v == null || isNaN(v) ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + d3.format('.1f')(Math.abs(v)) + '%';
   const cls = (v) => v == null ? 'dim' : v > 0 ? 'up' : v < 0 ? 'dn' : 'mut';
-  const short = (v) => v == null ? '—' : v >= 1e3 ? d3.format('.3~s')(v) : d3.format(',')(Math.round(v));
-  const el = (tag, attrs = {}, ...kids) => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'class') e.className = v; else if (k === 'text') e.textContent = v; else if (k.startsWith('on')) e.addEventListener(k.slice(2), v); else if (v != null) e.setAttribute(k, v); } kids.flat().forEach((k) => k != null && k !== false && e.append(k)); return e; };
+  const short = (v) => v == null ? '—' : v >= 1e6 ? d3.format('.3~s')(v).replace('M', 'M') : v >= 1e3 ? d3.format('.3~s')(v) : d3.format(',')(Math.round(v));
+  const el = (tag, attrs = {}, ...kids) => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'class') e.className = v; else if (k === 'text') e.textContent = v; else if (k.startsWith('on')) e.addEventListener(k.slice(2), v); else if (v != null) e.setAttribute(k, v); } kids.flat().forEach((k) => k != null && e.append(k)); return e; };
 
-  const TABS = [['all', 'All'], ['Currency', 'Currency'], ['Uniques', 'Uniques'], ['Divination Cards', 'Divination Cards'], ['Fragments', 'Fragments'], ['Essences', 'Essences']];
-  const DEF = { tab: 'all', q: '', dir: 'up', win: 'c24', pmin: '', pmax: '', conf: 'medium', sub: '', links: '' };
-  let S = { ...DEF };
-  try { Object.assign(S, JSON.parse(localStorage.getItem('em-simple') || '{}')); } catch (e) {}
-  const save = () => { try { localStorage.setItem('em-simple', JSON.stringify(S)); } catch (e) {} };
-  let M = null, H = null, shown = 50, ROWS = [];
-
-  const v24 = (i) => i.c24 ?? i.d1;
-  const val = (i, k) => k === 'c24' ? v24(i) : i[k];
-  const liqText = (i) => i.v != null ? short(i.v) + 'c traded/day' : i.ls != null ? i.ls + ' listed' : '';
-  const nFilters = () => ['pmin', 'pmax', 'sub', 'links'].filter((k) => S[k] !== '').length + (S.conf !== DEF.conf ? 1 : 0);
-
-  function inTab(i) {
-    if (S.tab === 'all') return true;
-    if (S.tab === 'Uniques') return i.g === 'Uniques';
-    return i.c === S.tab;
+  // official trade-site search for a unique: online sellers, same base type, same link count
+  function tradeUrl(i) {
+    if (i.g !== 'Uniques' || !M) return null;
+    const name = i.un || i.n.replace(/ \(\dL\)/, '').replace(/ \[.*\]$/, '').replace(/ #\d+$/, '');
+    const query = { status: { option: 'online' }, name };
+    if (i.b) query.type = i.b;
+    if (i.l) query.filters = { socket_filters: { filters: { links: { min: i.l, max: i.l } } } };
+    return `https://www.pathofexile.com/trade/search/${encodeURIComponent(M.league || 'Standard')}?q=${encodeURIComponent(JSON.stringify({ query }))}`;
   }
+  const tradeLink = (i, label = 'Trade ↗') => { const u = tradeUrl(i); if (!u) return null;
+    const a = el('a', { class: 'trade', href: u, target: '_blank', rel: 'noopener noreferrer', title: `Search ${i.n} on the official trade site`, text: label });
+    a.addEventListener('click', (e) => e.stopPropagation()); a.addEventListener('keydown', (e) => e.stopPropagation()); return a; };
+
+  // ---------------------------------------------------------------- state
+  const DEFAULTS = { q: '', market: 'all', cats: null, sub: '', links: '', pmin: '', pmax: '', sig: ['Gain', 'Hold', 'Lose', 'New'], conf: ['High', 'Medium'], fxOnly: false, period: 'c1', dir: 'abs', sortK: null, sortDir: -1 };
+  let S = JSON.parse(JSON.stringify(DEFAULTS));
+  try { const saved = JSON.parse(localStorage.getItem('em-filters') || 'null'); if (saved) S = Object.assign(S, saved); } catch (e) {}
+  const save = () => { try { localStorage.setItem('em-filters', JSON.stringify(S)); } catch (e) {} };
+  let M = null, H = null, shown = 50;
+
+  // ---------------------------------------------------------------- data
+  async function load(first) {
+    const j = await fetch('data/market.json?t=' + Date.now(), { cache: 'no-store' }).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    const changed = !M || M.generatedAt !== j.generatedAt;
+    M = j; H = null;
+    if (first || changed) { buildFilters(); render(); loadHourly(); }
+    return changed;
+  }
+  async function loadHourly() {
+    try { H = await fetch('data/hourly.json?t=' + Date.now(), { cache: 'no-store' }).then((r) => r.json()); } catch (e) { H = null; }
+    drawDivine();
+  }
+
+  // ---------------------------------------------------------------- filters UI
+  function buildFilters() {
+    $('#leagueChip').textContent = (M.league || 'League') + ' · PoE 1';
+    const counts = d3.rollup(M.items, (v) => v.length, (d) => d.c);
+    const cats = [...counts.keys()].sort((a, b) => (a.startsWith('Unique') - b.startsWith('Unique')) || a.localeCompare(b));
+    if (!S.cats) S.cats = cats.slice();
+    const box = $('#cats'); box.replaceChildren();
+    cats.forEach((c) => {
+      const cb = el('input', { type: 'checkbox' }); cb.checked = S.cats.includes(c);
+      cb.addEventListener('change', () => { S.cats = cb.checked ? [...new Set([...S.cats, c])] : S.cats.filter((x) => x !== c); shown = 50; save(); render(); });
+      box.append(el('label', {}, cb, c, el('span', { class: 'n', text: counts.get(c) })));
+    });
+    const subs = [...new Set(M.items.filter((i) => i.g === 'Uniques' && i.s).map((i) => i.s))].sort();
+    const sel = $('#sub'); sel.replaceChildren(new Option('Any type', ''), ...subs.map((s) => new Option(s, s))); sel.value = S.sub;
+    syncControls();
+  }
+  function syncControls() {
+    $('#q').value = S.q; $('#pmin').value = S.pmin; $('#pmax').value = S.pmax; $('#links').value = S.links; $('#sub').value = S.sub; $('#fxOnly').checked = S.fxOnly;
+    $$('#market .pill').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === S.market));
+    $$('#sig .tag').forEach((b) => b.setAttribute('aria-pressed', S.sig.includes(b.dataset.v)));
+    $$('#conf .tag').forEach((b) => b.setAttribute('aria-pressed', S.conf.includes(b.dataset.v)));
+    $$('#period button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === S.period));
+    $$('#dir button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === S.dir));
+    $('#uniqueBox').hidden = S.market === 'Exchange';
+    $$('#cats input').forEach((cb) => { cb.checked = S.cats && S.cats.includes(cb.parentElement.childNodes[1].textContent); });
+  }
+  const on = (sel, ev, fn) => $$(sel).forEach((x) => x.addEventListener(ev, fn));
+  on('#q', 'input', (e) => { S.q = e.target.value; shown = 50; save(); render(); });
+  on('#pmin', 'input', (e) => { S.pmin = e.target.value; shown = 50; save(); render(); });
+  on('#pmax', 'input', (e) => { S.pmax = e.target.value; shown = 50; save(); render(); });
+  on('#sub', 'change', (e) => { S.sub = e.target.value; shown = 50; save(); render(); });
+  on('#links', 'change', (e) => { S.links = e.target.value; shown = 50; save(); render(); });
+  on('#fxOnly', 'change', (e) => { S.fxOnly = e.target.checked; shown = 50; save(); render(); });
+  on('#market .pill', 'click', (e) => { S.market = e.currentTarget.dataset.v; shown = 50; syncControls(); save(); render(); });
+  on('#sig .tag', 'click', (e) => { const v = e.currentTarget.dataset.v; S.sig = S.sig.includes(v) ? S.sig.filter((x) => x !== v) : [...S.sig, v]; syncControls(); save(); render(); });
+  on('#conf .tag', 'click', (e) => { const v = e.currentTarget.dataset.v; S.conf = S.conf.includes(v) ? S.conf.filter((x) => x !== v) : [...S.conf, v]; syncControls(); save(); render(); });
+  on('#period button', 'click', (e) => { S.period = e.currentTarget.dataset.v; S.sortK = null; syncControls(); save(); render(); });
+  on('#dir button', 'click', (e) => { S.dir = e.currentTarget.dataset.v; S.sortK = null; syncControls(); save(); render(); });
+  on('#catAll', 'click', () => { S.cats = [...new Set(M.items.map((i) => i.c))]; syncControls(); save(); render(); });
+  on('#catNone', 'click', () => { S.cats = []; syncControls(); save(); render(); });
+  on('#reset', 'click', () => { S = JSON.parse(JSON.stringify(DEFAULTS)); S.cats = [...new Set(M.items.map((i) => i.c))]; shown = 50; syncControls(); save(); render(); });
+  on('#moreBtn', 'click', () => { shown += 100; renderTable(); });
+  on('thead th[data-k]', 'click', (e) => { const k = e.currentTarget.dataset.k; if (k === 'sp') return; if (S.sortK === k) S.sortDir = -S.sortDir; else { S.sortK = k; S.sortDir = ['n', 'c', 'sig'].includes(k) ? 1 : -1; } shown = 50; save(); render(); });
+
+  // ---------------------------------------------------------------- derived
+  const v24 = (i) => i.c24 ?? i.d1;
+  const val = (i, k) => k === 'c24' ? v24(i) : k === 'liq' ? (i.v ?? (i.ls != null ? i.ls * i.p : -1)) : i[k];
   function filtered() {
-    const q = S.q.trim().toLowerCase(), lo = parseFloat(S.pmin), hi = parseFloat(S.pmax);
-    const confOk = (c) => S.conf === 'any' || (S.conf === 'medium' ? c !== 'Low' : c === 'High');
-    return M.items.filter((i) => inTab(i) && confOk(i.conf) && (!q || i.n.toLowerCase().includes(q))
-      && (isNaN(lo) || i.p >= lo) && (isNaN(hi) || i.p <= hi) && (!S.sub || i.s === S.sub) && (S.links === '' || String(i.l || 0) === S.links));
+    const q = S.q.trim().toLowerCase(), pmin = parseFloat(S.pmin), pmax = parseFloat(S.pmax);
+    return M.items.filter((i) => (S.market === 'all' || i.g === S.market) && S.cats.includes(i.c) && S.sig.includes(i.sig) && S.conf.includes(i.conf)
+      && (!q || i.n.toLowerCase().includes(q)) && (isNaN(pmin) || i.p >= pmin) && (isNaN(pmax) || i.p <= pmax)
+      && (!S.sub || i.s === S.sub) && (S.links === '' || String(i.l || 0) === S.links) && (!S.fxOnly || i.src === 'fx'));
   }
   function sorted(rows) {
-    if (S.dir === 'price') return rows.slice().sort((a, b) => b.p - a.p);
-    const k = S.win, sgn = S.dir === 'up' ? 1 : -1;
-    return rows.filter((i) => val(i, k) != null && sgn * val(i, k) > 0).sort((a, b) => sgn * (val(b, k) - val(a, k)));
+    if (S.sortK) { const k = S.sortK, d = S.sortDir; return rows.slice().sort((a, b) => { const x = val(a, k), y = val(b, k); if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1; return (typeof x === 'string' ? x.localeCompare(y) : x - y) * d; }); }
+    const k = S.period, f = S.dir === 'up' ? (v) => v : S.dir === 'down' ? (v) => -v : Math.abs;
+    return rows.slice().sort((a, b) => { const x = val(a, k), y = val(b, k); if (x == null && y == null) return (b.v ?? b.ls ?? 0) - (a.v ?? a.ls ?? 0); if (x == null) return 1; if (y == null) return -1; return f(y) - f(x); });
   }
 
-  // ------------------------------------------------------------ render
-  function render() {
-    if (!M) return;
-    ROWS = sorted(filtered());
-    $$('#tabs button').forEach((b) => b.setAttribute('aria-selected', b.dataset.v === S.tab));
-    const more = $('#tabs select'); if (more) more.value = TABS.some(([v]) => v === S.tab) ? '' : S.tab;
-    $$('#dir button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === S.dir));
-    $$('#win button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === S.win));
-    $('#win').style.visibility = S.dir === 'price' ? 'hidden' : 'visible';
-    $('#q').value = S.q;
-    const nf = nFilters(); $('#filtersBtn').replaceChildren(...['Filters', nf ? el('span', { class: 'badge', text: nf }) : null].filter(Boolean));
-    const winTxt = { c1: 'in the last hour', c24: 'over 24 hours', f7: 'in the 7-day outlook' }[S.win];
-    const lab = { c1: 'last hour', c24: '24 hours', f7: '7-day outlook' }[S.win];
-    $('#count').textContent = S.dir === 'price' ? `${d3.format(',')(ROWS.length)} items, most valuable first` : `${d3.format(',')(ROWS.length)} items ${S.dir === 'up' ? 'rising' : 'falling'} ${winTxt}`;
-    renderTable();
+  // ---------------------------------------------------------------- render
+  let ROWS = [];
+  function render() { if (!M) return; ROWS = sorted(filtered()); renderTicker(); renderKpis(); renderTable(); renderHeat(); }
+  function renderTicker() {
+    const byN = new Map(M.items.map((i) => [i.n, i]));
+    const d = M.divine; const cur = (d.h || []).filter((x) => x != null).slice(-1)[0];
+    const parts = [['DIVINE', cur, d.c24 ?? null]];
+    ['Mirror of Kalandra', 'Exalted Orb', 'Mageblood [4 Flasks]', 'Headhunter'].forEach((n) => { const i = byN.get(n); if (i) parts.push([n.replace(' of Kalandra', '').replace(' [4 Flasks]', '').toUpperCase(), i.p, v24(i)]); });
+    const hi = M.items.filter((i) => i.conf === 'High' && i.src === 'fx' && i.c1 != null).sort((a, b) => Math.abs(b.c1) - Math.abs(a.c1))[0];
+    const t = $('#ticker'); t.replaceChildren(...parts.map(([n, p, c]) => el('span', {}, n + ' ', el('b', { text: fmtC(p) + 'c' }), ' ', el('span', { class: cls(c), text: c == null ? '' : (c >= 0 ? '▲' : '▼') + pct(Math.abs(c)).replace('+', '') }))));
+    if (hi) t.append(el('span', {}, '1H MOVER ', el('b', { text: hi.n }), ' ', el('span', { class: cls(hi.c1), text: pct(hi.c1) })));
+    const g = new Date(M.generatedAt); const mins = Math.round((Date.now() - g) / 60000);
+    $('#stamp').textContent = `Updated ${d3.utcFormat('%H:%M')(g)} UTC (${mins < 60 ? mins + ' min' : Math.round(mins / 60) + 'h'} ago)`;
   }
-  function spark(arr, w = 64, h = 20) {
+  function renderKpis() {
+    const d = M.divine; const cur = (d.h || []).filter((x) => x != null).slice(-1)[0];
+    const rows = ROWS, gain = rows.filter((i) => i.sig === 'Gain').length, lose = rows.filter((i) => i.sig === 'Lose').length;
+    const mir = M.items.find((i) => i.n === 'Mirror of Kalandra');
+    const k = (label, value, sub, subCls) => el('div', { class: 'kpi' }, el('div', { class: 'k', text: label }), el('div', { class: 'v', text: value }), el('div', { class: 's' + (subCls ? ' ' + subCls : ''), text: sub }));
+    $('#kpis').replaceChildren(
+      k('Divine Orb', fmtC(cur) + 'c', `1h ${pct(d.c1)} · 24h ${pct(d.c24)} · 7d → ${fmtC(d.f[6])}c`),
+      k('Forecast gainers', d3.format(',')(gain), `of ${d3.format(',')(rows.length)} items in view`, 'up'),
+      k('Forecast losers', d3.format(',')(lose), `of ${d3.format(',')(rows.length)} items in view`, 'dn'),
+      mir ? k('Mirror of Kalandra', fmtC(mir.p) + 'c', `≈ ${fmtC(mir.dv)} div · 7d ${pct(mir.f7)}`) : k('Items tracked', d3.format(',')(M.items.length), 'across all markets'));
+  }
+  function spark(arr, w = 72, h = 22) {
     const pts = (arr || []).map((v, i) => [i, v]).filter((p) => p[1] != null);
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('width', w); svg.setAttribute('height', h); svg.setAttribute('aria-hidden', 'true');
     if (pts.length < 2) return svg;
-    const x = d3.scaleLinear().domain([0, arr.length - 1]).range([1, w - 1]), y = d3.scaleLinear().domain(d3.extent(pts, (p) => p[1])).range([h - 2, 2]);
+    const x = d3.scaleLinear().domain([0, (arr.length || 24) - 1]).range([1, w - 1]), y = d3.scaleLinear().domain(d3.extent(pts, (p) => p[1])).range([h - 2, 2]);
     const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     p.setAttribute('d', d3.line().x((d) => x(d[0])).y((d) => y(d[1]))(pts)); p.setAttribute('fill', 'none'); p.setAttribute('stroke', pts[pts.length - 1][1] >= pts[0][1] ? UP : DN); p.setAttribute('stroke-width', '1.5');
     svg.append(p); return svg;
   }
-  function outlook(i) {
-    if (i.f7 == null) return el('span', { class: 'out h', text: 'new item' });
-    const c = i.sig === 'Gain' ? 'g' : i.sig === 'Lose' ? 'r' : 'h';
-    return el('span', { class: 'out ' + c, title: i.sig === 'Gain' ? 'Expected to gain value vs Divine' : i.sig === 'Lose' ? 'Expected to lose value vs Divine' : 'Expected to hold steady', text: (i.f7 > 0 ? '▲ ' : i.f7 < 0 ? '▼ ' : '') + pct(i.f7) });
-  }
-  function tradeUrl(i) {
-    if (i.g !== 'Uniques') return null;
-    const name = i.un || i.n.replace(/ \(\dL\)/, '').replace(/ \[.*\]$/, '').replace(/ #\d+$/, '');
-    const query = { status: { option: 'online' }, name }; if (i.b) query.type = i.b;
-    if (i.l) query.filters = { socket_filters: { filters: { links: { min: i.l, max: i.l } } } };
-    return `https://www.pathofexile.com/trade/search/${encodeURIComponent(M.league || 'Standard')}?q=${encodeURIComponent(JSON.stringify({ query }))}`;
-  }
-  function tradeLink(i, label = 'Trade ↗') { const u = tradeUrl(i); if (!u) return null; const a = el('a', { class: 'trade', href: u, target: '_blank', rel: 'noopener noreferrer', title: 'Search on the official trade site', text: label }); a.addEventListener('click', (e) => e.stopPropagation()); return a; }
   function renderTable() {
-    const tb = $('#tbody');
-    if (!ROWS.length) { tb.replaceChildren(el('tr', {}, el('td', { colspan: 6, class: 'empty', text: 'Nothing matches. Try another tab or clear the filters.' }))); $('#more').hidden = true; return; }
-    tb.replaceChildren(...ROWS.slice(0, shown).map((i) => {
-      const sub = [S.tab === 'all' || S.tab === 'Uniques' ? (i.g === 'Uniques' ? i.s || i.c : i.c) : null, i.l ? i.l + '-link' : null, liqText(i)].filter(Boolean).join(' · ');
-      const tr = el('tr', { tabindex: '0' },
-        el('td', { class: 'c-name' }, el('span', { class: 'nm', text: i.n }), el('span', { class: 'sub', text: sub })),
-        el('td', { class: 'mono c-price', text: fmtC(i.p) + 'c' }),
-        el('td', { class: 'mono c-1h ' + cls(i.c1), text: pct(i.c1) }),
-        el('td', { class: 'c-24' },
-          el('span', { class: 'ch lg-only' }, (() => { const sv = spark(i.sp); sv.classList.add('spk'); return sv; })(), el('span', { class: 'mono ' + cls(v24(i)), style: 'min-width:62px;display:inline-block', title: '24-hour change', text: pct(v24(i)) })),
-          (() => { const k = S.win === 'c1' ? 'c1' : 'c24', v = val(i, k); return el('span', { class: 'sm-only mono ' + cls(v) }, el('span', { class: 'dim', style: 'font-family:var(--sans);font-size:12px', text: k === 'c1' ? '1h ' : '24h ' }), pct(v)); })()),
-        el('td', { class: 'c-out' }, outlook(i)),
-        el('td', { class: 'c-trade' }, tradeLink(i)));
-      tr.addEventListener('click', () => openItem(i)); tr.addEventListener('keydown', (e) => { if (e.key === 'Enter') openItem(i); });
+    $$('thead th[data-k]').forEach((th) => th.setAttribute('aria-sort', S.sortK === th.dataset.k ? (S.sortDir < 0 ? 'descending' : 'ascending') : (!S.sortK && th.dataset.k === S.period ? 'descending' : 'none')));
+    const rows = ROWS; const tb = $('#tbody');
+    $('#count').textContent = `${d3.format(',')(rows.length)} of ${d3.format(',')(M.items.length)} items`;
+    if (!rows.length) { tb.replaceChildren(el('tr', {}, el('td', { colspan: 10, class: 'empty', text: 'No items match these filters.' }))); $('#moreBtn').hidden = true; return; }
+    tb.replaceChildren(...rows.slice(0, shown).map((i) => {
+      const sub = i.g === 'Uniques' ? [i.s, i.l ? i.l + 'L' : null].filter(Boolean).join(' · ') : (i.src === 'fx' ? 'Faustus hourly' : '');
+      const liq = i.v != null ? short(i.v) + 'c/day' : i.ls != null ? i.ls + ' listed' : '—';
+      const sc = i.sig === 'Gain' ? 'up' : i.sig === 'Lose' ? 'dn' : 'mut';
+      const tr = el('tr', { tabindex: '0', title: 'Open details' },
+        el('td', { class: 'nm' }, i.n, sub ? el('small', { text: sub }) : null),
+        el('td', { class: 'mut', text: i.c }),
+        el('td', { class: 'mono', text: fmtC(i.p) + 'c' }),
+        el('td', { class: 'mono ' + cls(i.c1), text: pct(i.c1) }),
+        el('td', { style: 'text-align:center;padding:4px 12px' }, spark(i.sp)),
+        el('td', { class: 'mono ' + cls(v24(i)), text: pct(v24(i)) }),
+        el('td', { class: 'mono ' + cls(i.f7), style: 'font-weight:600', text: pct(i.f7) }),
+        el('td', {}, el('span', { class: 'sig ' + sc, text: i.sig })),
+        el('td', { class: 'mut', text: liq }),
+        el('td', { style: 'text-align:center' }, tradeLink(i) || el('span', { class: 'dim', text: '—', title: 'Bulk items trade on Faustus' })));
+      tr.addEventListener('click', () => openDrawer(i));
+      tr.addEventListener('keydown', (e) => { if (e.key === 'Enter') openDrawer(i); });
       return tr;
     }));
-    $('#more').hidden = ROWS.length <= shown; $('#more').textContent = `Show more (${d3.format(',')(ROWS.length - shown)} more)`;
+    $('#moreBtn').hidden = rows.length <= shown;
+    $('#moreBtn').textContent = `Show more (${d3.format(',')(rows.length - shown)} left)`;
+  }
+  function renderHeat() {
+    const k = S.period, lab = { c1: '1h', c6: '6h', c24: '24h', f7: '7-day forecast' }[k];
+    $('#heatLab').textContent = lab;
+    const groups = d3.rollups(M.items.filter((i) => S.conf.includes(i.conf)), (v) => ({ med: d3.median(v, (i) => val(i, k)), n: v.length }), (i) => i.c)
+      .filter(([, g]) => g.med != null).sort((a, b) => b[1].med - a[1].med);
+    const col = d3.scaleLinear().domain([-30, -5, 0, 5, 30]).range([DN, '#f3a8ae', '#8b93a1', '#a9e5c3', UP]).clamp(true);
+    const ks = k === 'f7' ? 1 : k === 'c24' ? 1 : 4;
+    $('#heat').replaceChildren(...groups.map(([c, g]) => el('button', { type: 'button', style: `background:${col(g.med * ks)}`, title: `${c}: median ${pct(g.med)} (${g.n} items)`, onclick: () => { S.cats = [c]; S.market = c.startsWith('Unique') ? 'Uniques' : 'all'; shown = 50; syncControls(); save(); render(); } }, c, el('span', { text: pct(g.med) }))));
   }
 
-  // ------------------------------------------------------------ controls
-  function buildTabs() {
-    const box = $('#tabs'); box.replaceChildren();
-    TABS.forEach(([v, label]) => box.append(el('button', { type: 'button', role: 'tab', 'data-v': v, onclick: () => { S.tab = v; S.sub = ''; S.links = ''; shown = 50; save(); render(); } }, label)));
-    const others = [...new Set(M.items.filter((i) => i.g !== 'Uniques').map((i) => i.c))].filter((c) => !TABS.some(([v]) => v === c)).sort();
-    const sel = el('select', { 'aria-label': 'More categories' }, new Option('More…', ''), ...others.map((c) => new Option(c, c)));
-    sel.addEventListener('change', () => { if (sel.value) { S.tab = sel.value; shown = 50; save(); render(); } });
-    box.append(sel);
+  // ---------------------------------------------------------------- charts
+  function hourlyChart(host, { t, s, lo, hi, v }, opts = {}) {
+    host.replaceChildren();
+    const pts = t.map((ts, k) => ({ t: new Date(ts), p: s[k], lo: lo ? lo[k] : null, hi: hi ? hi[k] : null, v: v ? v[k] : null })).filter((d) => d.p != null);
+    if (pts.length < 2) { host.append(el('div', { class: 'empty', text: 'Not enough hourly history yet.' })); return; }
+    const W = Math.max(280, host.clientWidth), Hh = opts.h || 200, m = { t: 8, r: 10, b: 24, l: 10 };
+    const svg = d3.select(host).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${Hh}`).attr('role', 'img').attr('aria-label', opts.aria || 'Hourly price chart');
+    const yMin = d3.min(pts, (d) => d.lo ?? d.p), yMax = d3.max(pts, (d) => d.hi ?? d.p);
+    const y = d3.scaleLinear().domain([yMin, yMax]).nice(4);
+    const probe = svg.append('text').attr('class', 'tick').append('tspan').text(fmtC(y.domain()[1])); const tw = probe.node().getComputedTextLength(); probe.node().parentNode.remove();
+    m.l = Math.ceil(tw) + 12;
+    const x = d3.scaleUtc().domain(d3.extent(pts, (d) => d.t)).range([m.l, W - m.r]);
+    const volH = v ? 40 : 0; y.range([Hh - m.b - volH, m.t]);
+    svg.append('g').attr('class', 'grid').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickSize(-(W - m.l - m.r)).tickFormat(''));
+    svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickFormat(fmtC)).call((g) => g.select('.domain').remove());
+    svg.append('g').attr('transform', `translate(0,${Hh - m.b})`).call(d3.axisBottom(x).ticks(W < 450 ? 4 : 8).tickFormat(d3.utcFormat('%d %H:%M')));
+    if (v) { const vy = d3.scaleLinear().domain([0, d3.max(pts, (d) => d.v || 0) || 1]).range([0, volH - 6]); const bw = Math.max(1, (W - m.l - m.r) / pts.length - 1);
+      svg.append('g').selectAll('rect').data(pts).join('rect').attr('x', (d) => x(d.t) - bw / 2).attr('width', bw).attr('y', (d) => Hh - m.b - vy(d.v || 0)).attr('height', (d) => vy(d.v || 0)).attr('fill', '#2b3039'); }
+    if (lo) svg.append('path').datum(pts.filter((d) => d.lo != null && d.hi != null)).attr('fill', 'rgba(232,176,74,.18)').attr('d', d3.area().x((d) => x(d.t)).y0((d) => y(d.lo)).y1((d) => y(d.hi)));
+    svg.append('path').datum(pts).attr('fill', 'none').attr('stroke', ACC).attr('stroke-width', 2).attr('d', d3.line().x((d) => x(d.t)).y((d) => y(d.p)));
+    const tip = d3.select(host).append('div').attr('class', 'tip').style('display', 'none');
+    const dot = svg.append('circle').attr('r', 4).attr('fill', ACC).style('display', 'none');
+    svg.append('rect').attr('x', m.l).attr('y', 0).attr('width', W - m.l - m.r).attr('height', Hh).attr('fill', 'transparent')
+      .on('pointermove', (ev) => { const [mx] = d3.pointer(ev); const d = pts.reduce((a, b) => Math.abs(x(b.t) - mx) < Math.abs(x(a.t) - mx) ? b : a);
+        dot.style('display', null).attr('cx', x(d.t)).attr('cy', y(d.p)); tip.style('display', null).selectAll('*').remove();
+        tip.append('div').attr('class', 'mut').text(d3.utcFormat('%-d %b %H:00 UTC')(d.t));
+        tip.append('div').text(fmtC(d.p) + 'c' + (d.lo != null ? `  (${fmtC(d.lo)}–${fmtC(d.hi)})` : ''));
+        if (d.v != null) tip.append('div').attr('class', 'mut').text('traded ' + short(d.v) + 'c');
+        const tw2 = tip.node().offsetWidth, sx = x(d.t) / W * host.clientWidth; tip.style('left', Math.max(0, Math.min(host.clientWidth - tw2, sx - tw2 / 2)) + 'px').style('top', '0px'); })
+      .on('pointerleave', () => { tip.style('display', 'none'); dot.style('display', 'none'); });
   }
-  $('#q').addEventListener('input', (e) => { S.q = e.target.value; shown = 50; save(); render(); });
-  $$('#dir button').forEach((b) => b.addEventListener('click', () => { S.dir = b.dataset.v; shown = 50; save(); render(); }));
-  $$('#win button').forEach((b) => b.addEventListener('click', () => { S.win = b.dataset.v; shown = 50; save(); render(); }));
-  $('#more').addEventListener('click', () => { shown += 100; renderTable(); });
-
-  let lastFocus = null;
-  function openPanel(node, label) {
-    lastFocus = document.activeElement;
-    const close = el('button', { class: 'btn2 x', type: 'button', 'aria-label': 'Close', text: '✕', onclick: closePanel });
-    const d = el('div', { class: 'drawer', role: 'dialog', 'aria-modal': 'true', 'aria-label': label }, close, node);
-    $('#host').replaceChildren(el('div', { class: 'scrim', onclick: closePanel }), d); document.body.style.overflow = 'hidden'; close.focus(); return d;
+  function dailyChart(host, item) {
+    host.replaceChildren();
+    const days = M.days.map((d) => d3.utcParse('%Y-%m-%d')(d)), fdays = M.fdays.map((d) => d3.utcParse('%Y-%m-%d')(d));
+    const act = item.h.map((p, k) => ({ t: days[k], p })).filter((d) => d.p != null);
+    if (act.length < 1) return;
+    const fc = [act[act.length - 1], ...item.f.map((p, k) => ({ t: fdays[k], p })).filter((d) => d.p != null)];
+    const all = [...act, ...fc]; const W = Math.max(280, host.clientWidth), Hh = 170, m = { t: 8, r: 10, b: 24, l: 10 };
+    const svg = d3.select(host).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${Hh}`).attr('role', 'img').attr('aria-label', 'Daily price and 7-day forecast');
+    const y = d3.scaleLinear().domain([0, d3.max(all, (d) => d.p) * 1.05]).nice(4);
+    const probe = svg.append('text').attr('class', 'tick').append('tspan').text(fmtC(y.domain()[1])); m.l = Math.ceil(probe.node().getComputedTextLength()) + 12; probe.node().parentNode.remove();
+    const x = d3.scaleUtc().domain(d3.extent(all, (d) => d.t)).range([m.l, W - m.r]); y.range([Hh - m.b, m.t]);
+    svg.append('g').attr('class', 'grid').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickSize(-(W - m.l - m.r)).tickFormat(''));
+    svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickFormat(fmtC)).call((g) => g.select('.domain').remove());
+    svg.append('g').attr('transform', `translate(0,${Hh - m.b})`).call(d3.axisBottom(x).ticks(W < 450 ? 4 : 7).tickFormat(d3.utcFormat('%-d %b')));
+    const line = d3.line().x((d) => x(d.t)).y((d) => y(d.p));
+    svg.append('path').datum(act).attr('fill', 'none').attr('stroke', ACC).attr('stroke-width', 2.2).attr('d', line);
+    svg.append('path').datum(fc).attr('fill', 'none').attr('stroke', ACC).attr('stroke-width', 1.8).attr('stroke-dasharray', '5 4').attr('d', line);
+    svg.append('g').selectAll('circle').data(act).join('circle').attr('cx', (d) => x(d.t)).attr('cy', (d) => y(d.p)).attr('r', 3).attr('fill', ACC);
   }
-  function closePanel() { $('#host').replaceChildren(); document.body.style.overflow = ''; if (lastFocus) lastFocus.focus(); }
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#host').children.length) closePanel(); });
-
-  $('#filtersBtn').addEventListener('click', () => {
-    const inp = (id, ph, v) => el('input', { class: 'inp', id, inputmode: 'decimal', placeholder: ph, value: v });
-    const conf = el('select', { class: 'inp', id: 'f-conf' }, new Option('Any — include thinly traded items', 'any'), new Option('Medium or better (recommended)', 'medium'), new Option('High only — the most traded items', 'high')); conf.value = S.conf;
-    const subs = [...new Set(M.items.filter((i) => i.g === 'Uniques' && i.s).map((i) => i.s))].sort();
-    const sub = el('select', { class: 'inp', id: 'f-sub' }, new Option('Any', ''), ...subs.map((s) => new Option(s, s))); sub.value = S.sub;
-    const links = el('select', { class: 'inp', id: 'f-links' }, new Option('Any', ''), new Option('5-link', '5'), new Option('6-link', '6')); links.value = S.links;
-    const body = el('div', { style: 'display:flex;flex-direction:column;gap:18px' },
-      el('h2', { text: 'Filters' }),
-      el('div', { class: 'field' }, el('label', { text: 'Price in chaos' }), el('div', { class: 'row2' }, inp('f-min', 'From', S.pmin), inp('f-max', 'To', S.pmax)), el('div', { class: 'help', text: `1 Divine ≈ ${fmtC(divNow())} chaos` })),
-      el('div', { class: 'field' }, el('label', { for: 'f-conf', text: 'How much it trades' }), conf, el('div', { class: 'help', text: 'Thinly traded items have jumpy, less reliable numbers.' })),
-      el('div', { class: 'field' }, el('label', { for: 'f-sub', text: 'Unique item type' }), sub),
-      el('div', { class: 'field' }, el('label', { for: 'f-links', text: 'Links (uniques)' }), links),
-      el('div', { style: 'display:flex;gap:10px' },
-        el('button', { class: 'btn', type: 'button', text: 'Apply', onclick: () => { S.pmin = $('#f-min').value; S.pmax = $('#f-max').value; S.conf = conf.value; S.sub = sub.value; S.links = links.value; if (S.sub || S.links) S.tab = 'Uniques'; shown = 50; save(); closePanel(); render(); } }),
-        el('button', { class: 'btn2', type: 'button', text: 'Clear', onclick: () => { Object.assign(S, { pmin: '', pmax: '', conf: DEF.conf, sub: '', links: '' }); shown = 50; save(); closePanel(); render(); } })));
-    openPanel(body, 'Filters');
-  });
-
-  // ------------------------------------------------------------ item panel + charts
-  const divNow = () => (M.divine.h || []).filter((x) => x != null).slice(-1)[0];
   function seriesFor(name) {
-    if (!H) return null; const fx = H.fx || {}, nj = H.nj || {};
+    if (!H) return null;
+    const fx = H.fx || {}, nj = H.nj || {};
     if (fx.s && fx.s[name] && fx.s[name].filter((x) => x != null).length >= 2) return { src: 'fx', t: fx.t, s: fx.s[name], lo: fx.lo[name], hi: fx.hi[name], v: fx.v[name] };
     if (nj.s && nj.s[name]) return { src: 'nj', t: nj.t, s: nj.s[name] };
     return null;
   }
-  function axisLeftWidth(svg, y) { const t = svg.append('text').attr('class', 'tick').append('tspan').text(fmtC(y.domain()[1])); const w = t.node().getComputedTextLength(); t.node().parentNode.remove(); return Math.ceil(w) + 12; }
-  function lineChart(host, pts, opts) {
-    host.replaceChildren();
-    if (pts.filter((d) => d.p != null).length < 2) { host.append(el('div', { class: 'empty', style: 'padding:20px', text: opts.empty })); return; }
-    const W = Math.max(280, host.clientWidth), Hh = 180, m = { t: 8, r: 10, b: 24, l: 10 };
-    const svg = d3.select(host).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${Hh}`).attr('role', 'img').attr('aria-label', opts.aria);
-    const vals = pts.flatMap((d) => [d.p, d.lo, d.hi]).filter((x) => x != null);
-    const y = d3.scaleLinear().domain(opts.zero ? [0, d3.max(vals) * 1.05] : d3.extent(vals)).nice(4); m.l = axisLeftWidth(svg, y);
-    const x = d3.scaleUtc().domain(d3.extent(pts, (d) => d.t)).range([m.l, W - m.r]); y.range([Hh - m.b, m.t]);
-    svg.append('g').attr('class', 'grid').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickSize(-(W - m.l - m.r)).tickFormat(''));
-    svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickFormat(fmtC)).call((g) => g.select('.domain').remove());
-    svg.append('g').attr('transform', `translate(0,${Hh - m.b})`).call(d3.axisBottom(x).ticks(W < 450 ? 4 : 6).tickFormat(opts.tf));
-    const band = pts.filter((d) => d.lo != null && d.hi != null);
-    if (band.length > 1) svg.append('path').datum(band).attr('fill', 'rgba(232,176,74,.16)').attr('d', d3.area().x((d) => x(d.t)).y0((d) => y(d.lo)).y1((d) => y(d.hi)));
-    const line = d3.line().defined((d) => d.p != null).x((d) => x(d.t)).y((d) => y(d.p));
-    svg.append('path').datum(pts.filter((d) => !d.fc)).attr('fill', 'none').attr('stroke', ACC).attr('stroke-width', 2).attr('d', line);
-    const fc = pts.filter((d) => d.fc || d.joint); if (fc.length > 1) svg.append('path').datum(fc).attr('fill', 'none').attr('stroke', ACC).attr('stroke-width', 1.8).attr('stroke-dasharray', '5 4').attr('d', line);
-    const tip = d3.select(host).append('div').attr('class', 'tip').style('display', 'none'); const dot = svg.append('circle').attr('r', 4).attr('fill', ACC).style('display', 'none');
-    const ok = pts.filter((d) => d.p != null);
-    svg.append('rect').attr('x', m.l).attr('width', W - m.l - m.r).attr('height', Hh).attr('fill', 'transparent')
-      .on('pointermove', (ev) => { const [mx] = d3.pointer(ev); const d = ok.reduce((a, b) => Math.abs(x(b.t) - mx) < Math.abs(x(a.t) - mx) ? b : a);
-        dot.style('display', null).attr('cx', x(d.t)).attr('cy', y(d.p)); tip.style('display', null).text(`${opts.tipDate(d.t)}${d.fc ? ' (forecast)' : ''}: ${fmtC(d.p)}c`);
-        const tw = tip.node().offsetWidth, sx = x(d.t) / W * host.clientWidth; tip.style('left', Math.max(0, Math.min(host.clientWidth - tw, sx - tw / 2)) + 'px').style('top', '0px'); })
-      .on('pointerleave', () => { tip.style('display', 'none'); dot.style('display', 'none'); });
-  }
-  function openItem(i) {
-    const sr = seriesFor(i.n);
-    const stat = (k, v, c) => el('div', { class: 'stat' }, el('div', { class: 'k', text: k }), el('div', { class: 'v ' + (c || ''), text: v }));
-    const hourHost = el('div', { class: 'chart', style: 'min-height:180px' }), dayHost = el('div', { class: 'chart', style: 'min-height:180px' });
-    const node = el('div', { style: 'display:flex;flex-direction:column;gap:16px' },
-      el('div', {}, el('div', { class: 'mut', style: 'font-size:13px', text: [i.g === 'Uniques' ? i.s : i.c, i.l ? i.l + '-link' : null].filter(Boolean).join(' · ') }), el('h2', { text: i.n }),
-        el('div', { class: 'mono', style: 'font-size:28px;margin-top:6px' }, fmtC(i.p) + 'c ', el('span', { class: 'mut', style: 'font-size:14px', text: `≈ ${fmtC(i.dv)} Divine` })),
-        tradeLink(i, 'Search on official trade ↗') ? el('div', { style: 'margin-top:10px' }, tradeLink(i, 'Search on official trade ↗')) : null),
-      el('div', { class: 'stats' }, stat('Last hour', pct(i.c1), cls(i.c1)), stat('24 hours', pct(v24(i)), cls(v24(i))), stat('7-day outlook', pct(i.f7), cls(i.f7)),
-        stat('Since first traded', pct(i.chg), cls(i.chg)), stat('Trades', i.v != null ? short(i.v) + 'c/day' : i.ls != null ? i.ls + ' listed' : '—'), stat('Confidence', i.conf)),
-      el('section', {}, el('h3', { style: 'font-size:15px;margin:0 0 6px', text: 'Last 48 hours' }), hourHost),
-      el('section', {}, el('h3', { style: 'font-size:15px;margin:0 0 6px', text: 'Daily, with 7-day outlook (dashed)' }), dayHost));
-    openPanel(node, i.n);
-    requestAnimationFrame(() => {
-      const hp = sr ? sr.t.map((t, k) => ({ t: new Date(t), p: sr.s[k], lo: sr.lo ? sr.lo[k] : null, hi: sr.hi ? sr.hi[k] : null })) : [];
-      lineChart(hourHost, hp, { aria: i.n + ' hourly price', empty: H ? 'Hourly history is still building for this item.' : 'Loading…', tf: d3.utcFormat('%H:%M'), tipDate: d3.utcFormat('%-d %b %H:00 UTC') });
-      const P = d3.utcParse('%Y-%m-%d'); const act = i.h.map((p, k) => ({ t: P(M.days[k]), p })).filter((d) => d.p != null);
-      const last = act[act.length - 1]; const fc = i.f.map((p, k) => ({ t: P(M.fdays[k]), p, fc: true })).filter((d) => d.p != null);
-      lineChart(dayHost, [...act, ...(last ? [{ ...last, joint: true }] : []), ...fc], { aria: i.n + ' daily price and outlook', empty: 'Not enough daily history yet.', zero: true, tf: d3.utcFormat('%-d %b'), tipDate: d3.utcFormat('%-d %b') });
-    });
+  function drawDivine() {
+    const host = $('#divChart'); const sr = seriesFor('Divine Orb');
+    if (!sr) { host.replaceChildren(el('div', { class: 'empty', text: H ? 'Hourly history is still building.' : 'Loading…' })); return; }
+    hourlyChart(host, sr, { aria: 'Divine Orb hourly price in chaos, last 48 hours' });
   }
 
-  // ------------------------------------------------------------ data
-  function header() {
-    const d = M.divine; $('#league').textContent = (M.league || '') + ' · PoE 1';
-    $('#divine').replaceChildren('Divine ', el('b', { text: fmtC(divNow()) + 'c' }), ' ', el('span', { class: cls(d.c24), text: d.c24 != null ? pct(d.c24) + ' today' : '' }));
-    const g = new Date(M.generatedAt), mins = Math.round((Date.now() - g) / 60000);
-    $('#stamp').textContent = `Updated ${mins < 60 ? mins + ' min' : Math.round(mins / 60) + ' h'} ago`;
-    const ups = M.items.filter((i) => i.conf !== 'Low' && i.sig === 'Gain').length, downs = M.items.filter((i) => i.conf !== 'Low' && i.sig === 'Lose').length;
-    $('#headline').textContent = `${d3.format(',')(ups)} items look set to rise this week, ${d3.format(',')(downs)} to fall`;
+  // ---------------------------------------------------------------- drawer
+  let lastFocus = null;
+  function closeDrawer() { $('#drawerHost').replaceChildren(); document.body.style.overflow = ''; if (lastFocus) lastFocus.focus(); }
+  function openDrawer(i) {
+    lastFocus = document.activeElement;
+    const stat = (k, v, c) => el('div', { class: 'stat' }, el('div', { class: 'k', text: k }), el('div', { class: 'v ' + (c || ''), text: v }));
+    const hourHost = el('div', { class: 'chart', style: 'min-height:200px' }), dayHost = el('div', { class: 'chart', style: 'min-height:170px' });
+    const closeBtn = el('button', { class: 'btn2 x', type: 'button', 'aria-label': 'Close details', text: '✕', onclick: closeDrawer });
+    const sr = seriesFor(i.n);
+    const d = el('div', { class: 'drawer', role: 'dialog', 'aria-modal': 'true', 'aria-label': i.n + ' details' },
+      closeBtn,
+      el('div', {}, el('div', { class: 'mut', style: 'font-size:12px', text: [i.c, i.s, i.l ? i.l + '-link' : null].filter(Boolean).join(' · ') }), el('h2', { text: i.n }),
+        el('div', { class: 'mono', style: 'font-size:28px;margin-top:4px' }, fmtC(i.p) + 'c ', el('span', { class: 'mut', style: 'font-size:14px', text: `≈ ${fmtC(i.dv)} div` })),
+        i.g === 'Uniques' ? el('div', { style: 'margin-top:10px' }, tradeLink(i, 'Search on official trade ↗')) : null),
+      el('div', { class: 'stats' }, stat('1h', pct(i.c1), cls(i.c1)), stat('6h', pct(i.c6), cls(i.c6)), stat('24h', pct(v24(i)), cls(v24(i))),
+        stat('Since first traded', pct(i.chg), cls(i.chg)), stat('7-day forecast', pct(i.f7), cls(i.f7)), stat('Signal', `${i.sig} · ${i.conf}`, 't'),
+        stat('Momentum', i.tr, 't'), stat('Liquidity', i.v != null ? short(i.v) + 'c/day' : i.ls != null ? i.ls + ' listed' : '—'),
+        i.vh != null ? stat('Traded last hour', short(i.vh) + 'c') : null),
+      el('section', {}, el('h3', { style: 'margin:6px 0 2px;font-size:14px', text: 'Hourly · last 48h' }),
+        el('p', { class: 'mut', style: 'font-size:12px;margin:0 0 8px', text: sr && sr.src === 'fx' ? 'Faustus trades: line = volume-weighted price, band = low–high rate, bars = Chaos traded' : 'poe.ninja hourly snapshots' }), hourHost),
+      el('section', {}, el('h3', { style: 'margin:6px 0 2px;font-size:14px', text: 'Daily · since league start + 7-day forecast' }), dayHost));
+    $('#drawerHost').replaceChildren(el('div', { class: 'scrim', onclick: closeDrawer }), d);
+    document.body.style.overflow = 'hidden';
+    closeBtn.focus();
+    requestAnimationFrame(() => { if (sr) hourlyChart(hourHost, sr, { aria: i.n + ' hourly price' }); else hourHost.append(el('div', { class: 'empty', text: H ? 'No hourly history for this item yet.' : 'Loading hourly data…' })); dailyChart(dayHost, i); });
   }
-  async function load() {
-    const j = await fetch(DATA + 'market.json?t=' + Date.now(), { cache: 'no-store' }).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
-    const changed = !M || M.generatedAt !== j.generatedAt; M = j;
-    if (!$('#tabs').children.length) buildTabs();
-    header(); render();
-    if (changed) fetch(DATA + 'hourly.json?t=' + Date.now(), { cache: 'no-store' }).then((r) => r.json()).then((h) => { H = h; }).catch(() => {});
-    return changed;
-  }
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#drawerHost').children.length) closeDrawer(); });
+
+  // ---------------------------------------------------------------- refresh
   $('#refresh').addEventListener('click', async (e) => {
-    const b = e.currentTarget; b.disabled = true; b.textContent = 'Refreshing…';
-    try { const c = await load(); b.textContent = c ? 'Updated ✓' : 'Up to date'; } catch (err) { b.textContent = 'Try again'; }
-    setTimeout(() => { b.disabled = false; b.textContent = 'Refresh'; }, 2500);
+    const b = e.currentTarget, msg = $('#refreshMsg'); b.disabled = true; b.textContent = '↻ Refreshing…'; msg.textContent = '';
+    try { const changed = await load(false); const age = (Date.now() - new Date(M.generatedAt)) / 60000;
+      msg.textContent = changed ? 'Updated to the latest prices.' : age > 90 ? `Newest data is ${Math.round(age / 60)}h old: the hourly update is running late.` : 'Already up to date. Prices update every hour.';
+      if (changed) loadHourly();
+    } catch (err) { msg.textContent = 'Could not load data. Try again shortly.'; }
+    b.disabled = false; b.textContent = '↻ Refresh'; setTimeout(() => { msg.textContent = ''; }, 9000);
   });
-  load().catch(() => { $('#tbody').replaceChildren(el('tr', {}, el('td', { colspan: 6, class: 'empty', text: 'Could not load market data.' }))); });
+  let rw = window.innerWidth; window.addEventListener('resize', () => { if (Math.abs(window.innerWidth - rw) > 40) { rw = window.innerWidth; drawDivine(); } });
+
+  if (window.matchMedia('(max-width: 900px)').matches) $('#fbox').removeAttribute('open');
+  load(true).catch(() => { $('#tbody').replaceChildren(el('tr', {}, el('td', { colspan: 10, class: 'empty', text: 'Could not load market data.' }))); });
 })();
 </script>
 </body>
