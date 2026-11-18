@@ -37,6 +37,9 @@ MAX_DAY = 70           # league days covered by priors
 PHI, MAX_DAILY = 0.55, 0.6
 MIN_CHAOS = 5          # ignore values at the chaos floor
 BAD_LEAGUE_WORDS = ("hardcore", "hc ", "standard", "ruthless", "ssf", "solo")
+TYPES = {}            # item name -> category
+GRID = [0, 0.25, 0.5, 0.75, 1.0]
+SAMPLE = 400_000      # backtest rows used for the weight search
 
 
 def log(*a):
@@ -117,6 +120,7 @@ def load_league(name):
             divine[d] = v
         else:
             cur[r["Get"]][d] = v
+            TYPES.setdefault(r["Get"], "Currency")
     items = dict(cur)
     n_item_rows = 0
     for m in item_files:
@@ -134,7 +138,9 @@ def load_league(name):
             except (KeyError, ValueError):
                 continue
             d = (day_of(r["Date"]) - start).days
-            items.setdefault(item_key(r), {})[d] = v
+            k = item_key(r)
+            items.setdefault(k, {})[d] = v
+            TYPES.setdefault(k, r.get("Type") or "Other")
             n_item_rows += 1
     log(f"  start {start}, {len(divine)} divine days, {len(items)} items ({n_item_rows} item rows), {time.time()-t0:.0f}s")
     return league, start.isoformat(), divine, items
@@ -196,56 +202,116 @@ def main(out_file):
             by_item[n][lg] = lv
     div_logs = {lg: {d: math.log(v) for d, v in L["divine"].items() if v > 0} for lg, L in leagues.items()}
 
-    # ---------------------------------------------------------------- backtest (leave one league out)
-    samples = []   # (momentum, prior or None, actual)
+    # ---------------------------------------------------------------- category curves: league -> type -> day -> median 7d move
+    cat_moves = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     for n, per in by_item.items():
-        if len(per) < 2:
-            continue
+        t = TYPES.get(n, "Other")
+        for lg, lv in per.items():
+            for d in range(0, MAX_DAY + 2):
+                x = fwd7(lv, d)
+                if x is not None:
+                    cat_moves[t][lg][d].append(x)
+    cat_curves = {t: {lg: {d: statistics.median(v) for d, v in days.items()} for lg, days in lgs.items()} for t, lgs in cat_moves.items()}
+
+    def cat_prior(t, d, exclude=None):
+        vals = []
+        for lg, cur in cat_curves.get(t, {}).items():
+            if lg == exclude:
+                continue
+            xs = [cur[k] for k in (d - 1, d, d + 1) if k in cur]
+            if xs:
+                vals.append(statistics.median(xs))
+        return statistics.median(vals) if vals else None
+
+    # ---------------------------------------------------------------- backtest (leave one league out)
+    import random
+    random.seed(7)
+    samples = []   # (momentum, item prior or 0, category prior or 0, actual)
+    for n, per in by_item.items():
+        t = TYPES.get(n, "Other")
         for lg, lv in per.items():
             for d in range(2, MAX_DAY - 7):
                 a = fwd7(lv, d)
                 m = momentum7(lv, d)
                 if a is None or m is None:
                     continue
-                h, k = prior_from(per, d, exclude=lg)
-                samples.append((m, h, a))
-    log(f"backtest samples: {len(samples)}")
-    with_prior = [s for s in samples if s[1] is not None]
+                samples.append((n, t, lg, d, m, a))
+    log(f"backtest rows: {len(samples)}")
+    if len(samples) > SAMPLE:
+        samples = random.sample(samples, SAMPLE)
+    rows = []
+    for n, t, lg, d, m, a in samples:
+        h, _ = prior_from(by_item[n], d, exclude=lg)
+        c = cat_prior(t, d, exclude=lg)
+        rows.append((m, h or 0.0, c or 0.0, a))
 
-    def score(a1, a2, rows):
+    def score(w, rows):
+        wm, wh, wc = w
         err, hit, tot = [], 0, 0
-        for m, h, a in rows:
-            p = a1 * m + a2 * (h or 0.0)
+        gain_ok = gain_n = lose_ok = lose_n = 0
+        for m, h, c, a in rows:
+            p = wm * m + wh * h + wc * c
             err.append(abs(p - a))
             if abs(a) > 0.05 and abs(p) > 1e-9:
                 tot += 1
                 hit += (p > 0) == (a > 0)
+            if p > math.log(1.1):
+                gain_n += 1; gain_ok += a > 0
+            elif p < math.log(0.9):
+                lose_n += 1; lose_ok += a < 0
         return {"medianAbsErrPct": round((math.exp(statistics.median(err)) - 1) * 100, 2),
-                "directionHitPct": round(100 * hit / tot, 1) if tot else None, "n": len(rows)}
+                "directionHitPct": round(100 * hit / tot, 1) if tot else None,
+                "gainCalls": gain_n, "gainRightPct": round(100 * gain_ok / gain_n, 1) if gain_n else None,
+                "loseCalls": lose_n, "loseRightPct": round(100 * lose_ok / lose_n, 1) if lose_n else None,
+                "n": len(rows)}
 
-    grid = [i / 4 for i in range(0, 5)]
     results = []
-    for a1 in grid:
-        for a2 in grid:
-            if a1 == 0 and a2 == 0:
+    for wm in GRID:
+        for wh in GRID:
+            for wc in GRID:
+                results.append(((wm, wh, wc), score((wm, wh, wc), rows)))
+    named = {"noChange": (0, 0, 0), "momentumOnly": (1, 0, 0), "itemHistoryOnly": (0, 1, 0), "categoryHistoryOnly": (0, 0, 1)}
+    table = {k: next(r[1] for r in results if r[0] == w) for k, w in named.items()}
+    # best = lowest typical error among blends that still make calls in both directions
+    usable = [r for r in results if r[0] != (0, 0, 0) and r[1]["gainCalls"] and r[1]["loseCalls"]]
+    best = min(usable, key=lambda r: r[1]["medianAbsErrPct"])
+    table["best"] = best[1]
+    for k, v in table.items():
+        log(f"{k:20s} {v}")
+    log("best weights (momentum, item, category):", best[0])
+
+    # ---------------------------------------------------------------- Divine in chaos: momentum vs league curve
+    div_rows = []
+    for lg, lv in div_logs.items():
+        for d in range(2, MAX_DAY - 7):
+            a, m = fwd7(lv, d), momentum7(lv, d)
+            if a is None or m is None:
                 continue
-            results.append(((a1, a2), score(a1, a2, with_prior)))
-    best = min(results, key=lambda r: r[1]["medianAbsErrPct"])
-    base_mom = next(r for r in results if r[0] == (1.0, 0.0))[1]
-    base_prior = next(r for r in results if r[0] == (0.0, 1.0))[1]
-    log("momentum only:", base_mom)
-    log("prior only:   ", base_prior)
-    log("best blend:   ", best)
+            h, _ = prior_from(div_logs, d, exclude=lg)
+            div_rows.append((m, h or 0.0, 0.0, a))
+    div_results = [((wm, wh, 0), score((wm, wh, 0), div_rows)) for wm in GRID for wh in GRID if (wm, wh) != (0, 0)]
+    div_best = min(div_results, key=lambda r: r[1]["medianAbsErrPct"])
+    div_table = {"noChange": score((0, 0, 0), div_rows), "momentumOnly": next(r[1] for r in div_results if r[0] == (1, 0, 0)),
+                 "leagueCurveOnly": next(r[1] for r in div_results if r[0] == (0, 1, 0)), "best": div_best[1]}
+    for k, v in div_table.items():
+        log(f"divine {k:16s} {v}")
+    log("divine best weights (momentum, league curve):", div_best[0][:2])
 
     # ---------------------------------------------------------------- priors for the live model
     items_out = {}
     for n, per in by_item.items():
+        if len(per) < 2:
+            continue
         g = []
         for d in range(MAX_DAY):
             h, k = prior_from(per, d)
-            g.append(None if h is None else round(h, 4))
+            g.append(None if h is None else round(h, 3))
         if any(x is not None for x in g):
-            items_out[n] = {"g": g, "n": len(per)}
+            items_out[n] = {"g": g, "n": len(per), "t": TYPES.get(n, "Other")}
+    cats_out = {}
+    for t in cat_curves:
+        g = [cat_prior(t, d) for d in range(MAX_DAY)]
+        cats_out[t] = {"g": [None if x is None else round(x, 4) for x in g], "n": len(cat_curves[t])}
     div_g = []
     for d in range(MAX_DAY):
         h, k = prior_from(div_logs, d)
@@ -255,16 +321,17 @@ def main(out_file):
         "generatedAt": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
         "leagues": [{"name": lg, "start": L["start"], "days": L["days"], "items": len(L["logs"])} for lg, L in leagues.items()],
         "maxDay": MAX_DAY,
-        "weights": {"momentum": best[0][0], "prior": best[0][1]},
-        "backtest": {"momentumOnly": base_mom, "priorOnly": base_prior, "blend": best[1],
-                     "grid": [{"momentum": w[0], "prior": w[1], **s} for w, s in results]},
+        "weights": {"momentum": best[0][0], "item": best[0][1], "category": best[0][2]},
+        "divineWeights": {"momentum": div_best[0][0], "prior": div_best[0][1]},
+        "backtest": {"items": table, "divine": div_table, "sampledRows": len(rows)},
         "divine": {"g": div_g},
+        "categories": cats_out,
         "items": items_out,
     }
     os.makedirs(os.path.dirname(out_file) or ".", exist_ok=True)
     with open(out_file, "w") as fh:
         json.dump(out, fh, separators=(",", ":"))
-    log(f"wrote {out_file}: {len(items_out)} items, {os.path.getsize(out_file)/1e6:.2f} MB")
+    log(f"wrote {out_file}: {len(items_out)} items, {len(cats_out)} categories, {os.path.getsize(out_file)/1e6:.2f} MB")
 
 
 if __name__ == "__main__":

@@ -31,6 +31,8 @@ import urllib.request
 from collections import Counter
 
 LEAGUE = os.environ.get("LEAGUE", "Covens")
+LEAGUE_START = os.environ.get("LEAGUE_START", "2026-11-14")   # first day of poe.ninja data for the league
+PRIORS_FILE = os.environ.get("PRIORS_FILE", "data/priors.json")    # built by scripts/history.py
 PREV_HOURLY_URL = os.environ.get("PREV_HOURLY_URL", "")
 HOURLY_KEEP_HOURS = 48
 PHI = 0.55
@@ -326,6 +328,42 @@ def r4(x):
     return None if x is None else float(f"{x:.4g}")
 
 
+def load_priors():
+    try:
+        with open(PRIORS_FILE) as fh:
+            return json.load(fh)
+    except Exception as e:
+        print(f"note: no past-league priors ({e}); momentum only", file=sys.stderr)
+        return None
+
+
+def prior_at(g, day):
+    """Median 7-day log move at this league day from past leagues (None if unknown)."""
+    if not g or day < 0:
+        return None
+    d = min(day, len(g) - 1)
+    vals = [g[k] for k in (d - 1, d, d + 1) if 0 <= k < len(g) and g[k] is not None]
+    return sorted(vals)[len(vals) // 2] if vals else None
+
+
+# live category label -> category name used in poe.ninja's dumps
+DUMP_TYPE = {"Currency": "Currency", "Fragments": "Currency", "Essences": "Essence", "Fossils": "Fossil",
+             "Resonators": "Resonator", "Oils": "Oil", "Delirium Orbs": "DeliriumOrb", "Omens": "Omen",
+             "Tattoos": "Tattoo", "Artifacts": "Artifact", "Divination Cards": "DivinationCard",
+             "Runegrafts": "Runegraft", "Allflame Embers": "AllflameEmber", "Astrolabes": "Astrolabe",
+             "Scarabs": "Scarab", "Unique Weapons": "UniqueWeapon", "Unique Armours": "UniqueArmour",
+             "Unique Accessories": "UniqueAccessory", "Unique Flasks": "UniqueFlask", "Unique Jewels": "UniqueJewel",
+             "Unique Relics": "UniqueRelic", "Unique Tinctures": "UniqueTincture", "Unique Maps": "UniqueMap"}
+
+
+def blend_path(mom_path, parts):
+    """Cumulative 7-day log path = w0*momentum + sum(w*prior) spread evenly over the week.
+    parts: [momentum weight, (weight, prior log move or None), ...]; a missing prior counts as 0, as in the backtest."""
+    w0 = parts[0]
+    extra = sum(w * (h or 0.0) for w, h in parts[1:])
+    return [w0 * mom_path[k] + extra * (k + 1) / 7 for k in range(7)]
+
+
 def build(recs, now):
     date = now.date()
     days = [(date - datetime.timedelta(days=6 - i)).isoformat() for i in range(7)]
@@ -339,8 +377,18 @@ def build(recs, now):
         if dh[i] is None:
             nxt = next((dh[j] for j in range(i, 7) if dh[j] is not None), None)
             dh[i] = nxt
+    priors = load_priors()
+    if priors and "categories" not in priors:      # older file format: ignore
+        priors = None
+    league_day = (date - datetime.date.fromisoformat(LEAGUE_START)).days
+    w = priors["weights"] if priors else {"momentum": 1.0, "item": 0.0, "category": 0.0}
+    dw = priors["divineWeights"] if priors else {"momentum": 1.0, "prior": 0.0}
+    pitems = priors.get("items", {}) if priors else {}
+    pcats = priors.get("categories", {}) if priors else {}
     dm, _ = momentum([v for v in dh if v is not None])
-    div_fc = [dh[-1] * math.exp(x) for x in path(dm)]
+    div_prior = prior_at(priors["divine"]["g"], league_day) if priors else None
+    div_path = blend_path(path(dm), [dw["momentum"], (dw["prior"], div_prior)])
+    div_fc = [dh[-1] * math.exp(x) for x in div_path]
 
     items = []
     for r in recs:
@@ -349,7 +397,11 @@ def build(recs, now):
         pts = [(i, r["hist"][i] / dh[i]) for i in range(7) if r["hist"][i] is not None and dh[i]]
         if len(pts) >= 2:
             m, d = momentum([v for _, v in pts])
-            fc = path(m)
+            pr = pitems.get(r["name"])
+            h = prior_at(pr["g"], league_day) if pr else None
+            ct = (pr or {}).get("t") or DUMP_TYPE.get(r["cat"])
+            c = prior_at(pcats[ct]["g"], league_day) if ct in pcats else None
+            fc = blend_path(path(m), [w["momentum"], (w["item"], h), (w["category"], c)])
             f7 = math.exp(fc[-1]) - 1
             total = pts[-1][1] / pts[0][1] - 1
             d1 = math.exp(d[-1]) - 1
@@ -364,6 +416,10 @@ def build(recs, now):
         else:
             f7 = total = d1 = None
             trend, sig, fpath = "New", "New", [None] * 7
+            pr = pitems.get(r["name"])
+            h = prior_at(pr["g"], league_day) if pr else None
+            ct = (pr or {}).get("t") or DUMP_TYPE.get(r["cat"])
+            c = prior_at(pcats[ct]["g"], league_day) if ct in pcats else None
         items.append({
             "n": r["name"], "g": r["group"], "c": r["cat"], "s": r["sub"], "l": r["links"],
             **({"un": r.get("uname"), "b": r.get("base")} if r["group"] == "Uniques" else {}),
@@ -375,6 +431,9 @@ def build(recs, now):
             "d1": None if d1 is None else round(d1 * 100, 1),
             "f7": None if f7 is None else round(f7 * 100, 1),
             "sig": sig, "conf": confidence(r, len(pts)), "tr": trend,
+            "hp": None if h is None else round((math.exp(h) - 1) * 100, 1),
+            "hn": pitems[r["name"]]["n"] if h is not None else 0,
+            "cp": None if c is None else round((math.exp(c) - 1) * 100, 1),
         })
     market = {
         "generatedAt": now.isoformat(timespec="seconds"), "league": LEAGUE,
@@ -382,7 +441,15 @@ def build(recs, now):
         "divine": {"h": [r4(x) for x in dh], "f": [r4(x) for x in div_fc]},
         "items": items,
         "model": "Prices converted to Divines; 7-day damped momentum (0.75*last + 0.25*previous daily log-change, "
-                 f"damped by {PHI}/day); Gain/Lose beyond +/-10%.",
+                 f"damped by {PHI}/day), blended with the median move of the same item at the same league day in "
+                 "past leagues where that history exists; Gain/Lose beyond +/-10%.",
+        "leagueDay": league_day,
+        "priors": None if not priors else {
+            "weights": w, "divineWeights": dw, "leagues": [l["name"] for l in priors.get("leagues", [])],
+            "backtest": priors["backtest"],
+            "divinePct": None if div_prior is None else round((math.exp(div_prior) - 1) * 100, 1),
+            "itemsWithHistory": sum(1 for it in items if it.get("hn")),
+        },
     }
     return market, div
 
