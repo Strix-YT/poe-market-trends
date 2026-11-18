@@ -206,7 +206,7 @@ footer details{margin-top:6px}
     <div class="tblwrap">
       <table>
         <thead><tr>
-          <th data-k="n">Item</th><th data-k="c">Type</th><th data-k="p">Price</th><th data-k="c1">1h</th>
+          <th data-k="n">Item</th><th data-k="c">Type</th><th data-k="p" title="Chaos below 1 Divine, Divines above">Price</th><th data-k="c1">1h</th>
           <th data-k="sp" style="cursor:default;text-align:center">Last 24h</th><th data-k="c24">24h</th>
           <th data-k="f7">7d fcst</th><th data-k="sig">Signal</th><th data-k="liq">Liquidity</th><th style="cursor:default;text-align:center">Trade</th>
         </tr></thead>
@@ -237,6 +237,13 @@ footer details{margin-top:6px}
   const UP = '#3ecf8e', DN = '#f0616d', ACC = '#e8b04a';
   const fmtC = (v) => v == null || isNaN(v) ? '—' : v >= 1000 ? d3.format(',.0f')(v) : v >= 100 ? d3.format(',.0f')(v) : v >= 1 ? d3.format(',.2~f')(v) : d3.format('.3~r')(v);
   const pct = (v) => v == null || isNaN(v) ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + d3.format('.1f')(Math.abs(v)) + '%';
+
+  const divRate = () => M ? (M.divine.h || []).filter((x) => x != null).slice(-1)[0] : null;
+  const fmtD = (d) => d >= 100 ? d3.format(',.0f')(d) : d >= 10 ? d3.format('.1f')(d) : d3.format('.2f')(d);
+  const isDiv = (p) => { const r = divRate(); return r && p != null && p >= r; };
+  // items worth a Divine or more are shown in Divines, cheaper ones in chaos
+  const fmtP = (p) => isDiv(p) ? fmtD(p / divRate()) + ' div' : fmtC(p) + 'c';
+  const altP = (p) => isDiv(p) ? `≈ ${fmtC(p)}c` : (divRate() && p != null && p >= 1 ? `≈ ${d3.format('.2~r')(p / divRate())} div` : '');
   const cls = (v) => v == null ? 'dim' : v > 0 ? 'up' : v < 0 ? 'dn' : 'mut';
   const short = (v) => v == null ? '—' : v >= 1e6 ? d3.format('.3~s')(v).replace('M', 'M') : v >= 1e3 ? d3.format('.3~s')(v) : d3.format(',')(Math.round(v));
   const el = (tag, attrs = {}, ...kids) => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'class') e.className = v; else if (k === 'text') e.textContent = v; else if (k.startsWith('on')) e.addEventListener(k.slice(2), v); else if (v != null) e.setAttribute(k, v); } kids.flat().forEach((k) => k != null && e.append(k)); return e; };
@@ -342,7 +349,7 @@ footer details{margin-top:6px}
     const parts = [['DIVINE', cur, d.c24 ?? null]];
     ['Mirror of Kalandra', 'Exalted Orb', 'Mageblood [4 Flasks]', 'Headhunter'].forEach((n) => { const i = byN.get(n); if (i) parts.push([n.replace(' of Kalandra', '').replace(' [4 Flasks]', '').toUpperCase(), i.p, v24(i)]); });
     const hi = M.items.filter((i) => i.conf === 'High' && i.src === 'fx' && i.c1 != null).sort((a, b) => Math.abs(b.c1) - Math.abs(a.c1))[0];
-    const t = $('#ticker'); t.replaceChildren(...parts.map(([n, p, c]) => el('span', {}, n + ' ', el('b', { text: fmtC(p) + 'c' }), ' ', el('span', { class: cls(c), text: c == null ? '' : (c >= 0 ? '▲' : '▼') + pct(Math.abs(c)).replace('+', '') }))));
+    const t = $('#ticker'); t.replaceChildren(...parts.map(([n, p, c]) => el('span', {}, n + ' ', el('b', { text: n === 'DIVINE' ? fmtC(p) + 'c' : fmtP(p) }), ' ', el('span', { class: cls(c), text: c == null ? '' : (c >= 0 ? '▲' : '▼') + pct(Math.abs(c)).replace('+', '') }))));
     if (hi) t.append(el('span', {}, '1H MOVER ', el('b', { text: hi.n }), ' ', el('span', { class: cls(hi.c1), text: pct(hi.c1) })));
     const g = new Date(M.generatedAt); const mins = Math.round((Date.now() - g) / 60000);
     $('#stamp').textContent = `Updated ${d3.utcFormat('%H:%M')(g)} UTC (${mins < 60 ? mins + ' min' : Math.round(mins / 60) + 'h'} ago)`;
@@ -356,7 +363,7 @@ footer details{margin-top:6px}
       k('Divine Orb', fmtC(cur) + 'c', `1h ${pct(d.c1)} · 24h ${pct(d.c24)} · 7d → ${fmtC(d.f[6])}c`),
       k('Forecast gainers', d3.format(',')(gain), `of ${d3.format(',')(rows.length)} items in view`, 'up'),
       k('Forecast losers', d3.format(',')(lose), `of ${d3.format(',')(rows.length)} items in view`, 'dn'),
-      mir ? k('Mirror of Kalandra', fmtC(mir.p) + 'c', `≈ ${fmtC(mir.dv)} div · 7d ${pct(mir.f7)}`) : k('Items tracked', d3.format(',')(M.items.length), 'across all markets'));
+      mir ? k('Mirror of Kalandra', fmtP(mir.p), `${altP(mir.p)} · 7d ${pct(mir.f7)}`) : k('Items tracked', d3.format(',')(M.items.length), 'across all markets'));
   }
   function spark(arr, w = 72, h = 22) {
     const pts = (arr || []).map((v, i) => [i, v]).filter((p) => p[1] != null);
@@ -379,7 +386,7 @@ footer details{margin-top:6px}
       const tr = el('tr', { tabindex: '0', title: 'Open details' },
         el('td', { class: 'nm' }, i.n, sub ? el('small', { text: sub }) : null),
         el('td', { class: 'mut', text: i.c }),
-        el('td', { class: 'mono', text: fmtC(i.p) + 'c' }),
+        el('td', { class: 'mono', title: altP(i.p), text: fmtP(i.p) }),
         el('td', { class: 'mono ' + cls(i.c1), text: pct(i.c1) }),
         el('td', { style: 'text-align:center;padding:4px 12px' }, spark(i.sp)),
         el('td', { class: 'mono ' + cls(v24(i)), text: pct(v24(i)) }),
@@ -479,7 +486,7 @@ footer details{margin-top:6px}
     const d = el('div', { class: 'drawer', role: 'dialog', 'aria-modal': 'true', 'aria-label': i.n + ' details' },
       closeBtn,
       el('div', {}, el('div', { class: 'mut', style: 'font-size:12px', text: [i.c, i.s, i.l ? i.l + '-link' : null].filter(Boolean).join(' · ') }), el('h2', { text: i.n }),
-        el('div', { class: 'mono', style: 'font-size:28px;margin-top:4px' }, fmtC(i.p) + 'c ', el('span', { class: 'mut', style: 'font-size:14px', text: `≈ ${fmtC(i.dv)} div` })),
+        el('div', { class: 'mono', style: 'font-size:28px;margin-top:4px' }, fmtP(i.p) + ' ', el('span', { class: 'mut', style: 'font-size:14px', text: altP(i.p) })),
         i.g === 'Uniques' ? el('div', { style: 'margin-top:10px' }, tradeLink(i, 'Search on official trade ↗')) : null),
       el('div', { class: 'stats' }, stat('1h', pct(i.c1), cls(i.c1)), stat('6h', pct(i.c6), cls(i.c6)), stat('24h', pct(v24(i)), cls(v24(i))),
         stat('Since first traded', pct(i.chg), cls(i.chg)), stat('7-day forecast', pct(i.f7), cls(i.f7)), stat('Signal', `${i.sig} · ${i.conf}`, 't'),

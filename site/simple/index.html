@@ -200,6 +200,13 @@ footer summary{cursor:pointer;color:var(--muted)}
   const UP = '#3ecf8e', DN = '#f0616d', ACC = '#e8b04a';
   const fmtC = (v) => v == null || isNaN(v) ? '—' : v >= 100 ? d3.format(',.0f')(v) : v >= 1 ? d3.format(',.2~f')(v) : d3.format('.3~r')(v);
   const pct = (v) => v == null || isNaN(v) ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + d3.format('.1f')(Math.abs(v)) + '%';
+
+  const divRate = () => M ? (M.divine.h || []).filter((x) => x != null).slice(-1)[0] : null;
+  const fmtD = (d) => d >= 100 ? d3.format(',.0f')(d) : d >= 10 ? d3.format('.1f')(d) : d3.format('.2f')(d);
+  const isDiv = (p) => { const r = divRate(); return r && p != null && p >= r; };
+  // items worth a Divine or more are shown in Divines, cheaper ones in chaos
+  const fmtP = (p) => isDiv(p) ? fmtD(p / divRate()) + ' div' : fmtC(p) + 'c';
+  const altP = (p) => isDiv(p) ? `≈ ${fmtC(p)}c` : (divRate() && p != null && p >= 1 ? `≈ ${d3.format('.2~r')(p / divRate())} div` : '');
   const cls = (v) => v == null ? 'dim' : v > 0 ? 'up' : v < 0 ? 'dn' : 'mut';
   const short = (v) => v == null ? '—' : v >= 1e3 ? d3.format('.3~s')(v) : d3.format(',')(Math.round(v));
   const el = (tag, attrs = {}, ...kids) => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'class') e.className = v; else if (k === 'text') e.textContent = v; else if (k.startsWith('on')) e.addEventListener(k.slice(2), v); else if (v != null) e.setAttribute(k, v); } kids.flat().forEach((k) => k != null && k !== false && e.append(k)); return e; };
@@ -278,7 +285,7 @@ footer summary{cursor:pointer;color:var(--muted)}
       const sub = [S.tab === 'all' || S.tab === 'Uniques' ? (i.g === 'Uniques' ? i.s || i.c : i.c) : null, i.l ? i.l + '-link' : null, liqText(i)].filter(Boolean).join(' · ');
       const tr = el('tr', { tabindex: '0' },
         el('td', { class: 'c-name' }, el('span', { class: 'nm', text: i.n }), el('span', { class: 'sub', text: sub })),
-        el('td', { class: 'mono c-price', text: fmtC(i.p) + 'c' }),
+        el('td', { class: 'mono c-price', title: altP(i.p), text: fmtP(i.p) }),
         el('td', { class: 'mono c-1h ' + cls(i.c1), text: pct(i.c1) }),
         el('td', { class: 'c-24' },
           el('span', { class: 'ch lg-only' }, (() => { const sv = spark(i.sp); sv.classList.add('spk'); return sv; })(), el('span', { class: 'mono ' + cls(v24(i)), style: 'min-width:62px;display:inline-block', title: '24-hour change', text: pct(v24(i)) })),
@@ -372,7 +379,7 @@ footer summary{cursor:pointer;color:var(--muted)}
     const hourHost = el('div', { class: 'chart', style: 'min-height:180px' }), dayHost = el('div', { class: 'chart', style: 'min-height:180px' });
     const node = el('div', { style: 'display:flex;flex-direction:column;gap:16px' },
       el('div', {}, el('div', { class: 'mut', style: 'font-size:13px', text: [i.g === 'Uniques' ? i.s : i.c, i.l ? i.l + '-link' : null].filter(Boolean).join(' · ') }), el('h2', { text: i.n }),
-        el('div', { class: 'mono', style: 'font-size:28px;margin-top:6px' }, fmtC(i.p) + 'c ', el('span', { class: 'mut', style: 'font-size:14px', text: `≈ ${fmtC(i.dv)} Divine` })),
+        el('div', { class: 'mono', style: 'font-size:28px;margin-top:6px' }, fmtP(i.p) + ' ', el('span', { class: 'mut', style: 'font-size:14px', text: altP(i.p) })),
         tradeLink(i, 'Search on official trade ↗') ? el('div', { style: 'margin-top:10px' }, tradeLink(i, 'Search on official trade ↗')) : null),
       el('div', { class: 'stats' }, stat('Last hour', pct(i.c1), cls(i.c1)), stat('24 hours', pct(v24(i)), cls(v24(i))), stat('7-day outlook', pct(i.f7), cls(i.f7)),
         stat('Since first traded', pct(i.chg), cls(i.chg)), stat('Trades', i.v != null ? short(i.v) + 'c/day' : i.ls != null ? i.ls + ' listed' : '—'), stat('Confidence', i.conf)),
