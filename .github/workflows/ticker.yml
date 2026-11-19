@@ -1,0 +1,33 @@
+name: Hourly ticker
+
+# GitHub's own cron often skips runs on free repos. This job stays alive, starts the price
+# refresh once an hour, and after ~5 hours hands over to a fresh copy of itself (jobs may run 6h).
+# Runs started with workflow_dispatch by the built-in token are allowed to trigger other runs.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "3 */6 * * *"   # backup: restarts the chain if it ever stops
+
+permissions:
+  actions: write
+
+concurrency:
+  group: ticker
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - name: Start the refresh every hour, then hand over
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          for i in 1 2 3 4 5; do
+            gh workflow run refresh.yml --repo "$REPO" --ref main || echo "refresh dispatch failed"
+            echo "tick $i at $(date -u +%H:%M)"
+            sleep 3540
+          done
+          gh workflow run ticker.yml --repo "$REPO" --ref main
