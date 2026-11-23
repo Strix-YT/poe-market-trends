@@ -143,7 +143,7 @@ footer details{margin-top:6px}
 .acl li[aria-selected=true],.acl li:hover{background:#222833}
 .acl li b{font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.acl li b mark{background:none;color:var(--accent);font-weight:600}
 .acl li small{color:var(--dim);font-size:11px;white-space:nowrap}.acl li span{font-family:var(--mono);font-size:12px;color:var(--fg2);white-space:nowrap}
-.acl .none{color:var(--muted);cursor:default}
+.acl .none{color:var(--muted);cursor:default}.acl li .ico{width:18px;height:18px;margin:0;align-self:center}
 .quick{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px}
 .tin{background:var(--panel2);border:1px solid var(--line2);color:var(--fg);border-radius:5px;padding:4px 6px;font-family:var(--mono);font-size:12px;text-align:right}
 .tin.q{width:92px}.tin.a{width:76px}
@@ -160,15 +160,26 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .alloc .bar2{height:10px;background:#1d2128;border-radius:3px;overflow:hidden}.alloc .bar2 i{display:block;height:100%;background:var(--accent);border-radius:3px}
 .alloc .r span:last-child{text-align:right;font-family:var(--mono);color:var(--muted)}
 .note{font-size:12px;color:var(--muted)}
-.about{background:#0b0d10;border:1px solid var(--line2);border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.55}
-.about .ah{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:6px}
-.about .ah b{font-size:13px}.about .ah span{font-size:12px;color:var(--muted)}
-.about .mod{color:#9db4ff}.about .mod.opt{color:#7f8fbf}.about .mod.opt::after{content:' (some versions)';color:var(--dim);font-size:11px}
-.about .imp{color:#9db4ff;border-bottom:1px solid var(--line2);padding-bottom:6px;margin-bottom:6px}
-.about .eff{color:var(--fg)}.about .prop{color:var(--fg2)}.about .use{color:var(--muted);font-size:12px;margin-top:6px}
-.about .rew{color:var(--accent2);font-weight:600}
-.about .fl{color:#c8915a;font-style:italic;font-size:12px;margin-top:8px;white-space:pre-line}
-.about .lk{margin-top:8px;font-size:12px}
+.about{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+.about .art{flex:0 0 auto;width:96px;min-height:96px;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 45%,#1d2129 0%,#0b0d10 70%);border:1px solid var(--line2);border-radius:8px;padding:8px}
+.about .art img{max-width:78px;max-height:156px;image-rendering:auto}
+.about .side{flex:1 1 260px;min-width:0;display:flex;flex-direction:column;gap:8px}
+.about .lk{font-size:12px}
+/* in-game style tooltip */
+.ptip{--k:#aa9e82;background:rgba(0,0,0,.92);border:1px solid color-mix(in srgb,var(--k) 55%,#000);font-family:'Fontin SmallCaps','Fontin',Georgia,'Times New Roman',serif;font-size:15px;line-height:1.35;text-align:center;color:#c8c8c8;box-shadow:0 6px 22px rgba(0,0,0,.5)}
+.ptip.u{--k:#af6025}.ptip.card{--k:#d4d4d4}.ptip.cur{--k:#aa9e82}
+.ptip .hd{padding:6px 14px;background:linear-gradient(180deg,color-mix(in srgb,var(--k) 26%,#000) 0%,color-mix(in srgb,var(--k) 10%,#000) 100%);border-bottom:1px solid color-mix(in srgb,var(--k) 50%,#000);color:var(--k);font-variant:small-caps;letter-spacing:.02em}
+.ptip .hd .n{font-size:18px}.ptip .hd .b{font-size:16px}
+.ptip .bd{padding:8px 14px 10px}
+.ptip .sep{height:1px;margin:7px auto;width:82%;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--k) 75%,#000),transparent)}
+.ptip .pr{color:#7f7f7f}.ptip .pr b{color:#fff;font-weight:400}
+.ptip .md{color:#8888ff}.ptip .md.opt{opacity:.7}.ptip .md.opt::after{content:' *';color:#7f7f7f}
+.ptip .tx{color:#c8c8c8}.ptip .rw{color:#e8b04a;font-size:16px}
+.ptip .fl{color:#af6025;font-style:italic;white-space:pre-line}
+.ptip .us{color:#7f7f7f;font-size:13px}
+.ptip .ft{color:#7f7f7f;font-size:12px}
+.ico{width:22px;height:22px;object-fit:contain;vertical-align:middle;margin-right:7px}
+td.nm .ico{margin-top:-2px}
 </style>
 </head>
 <body>
@@ -391,7 +402,7 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
     const j = await fetch('data/market.json?t=' + Date.now(), { cache: 'no-store' }).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
     const changed = !M || M.generatedAt !== j.generatedAt;
     M = j; H = null; if (changed) INFO = undefined;
-    if (first || changed) { buildFilters(); render(); loadHourly(); }
+    if (first || changed) { buildFilters(); render(); loadHourly(); loadIcons().then(() => { if (!M) return; renderTable(); if (view() === 'tracker') renderTracker(); }); }
     return changed;
   }
   async function loadHourly() {
@@ -508,7 +519,7 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
       const liq = i.v != null ? short(i.v) + 'c/day' : i.ls != null ? i.ls + ' listed' : '—';
       const sc = i.sig === 'Gain' ? 'up' : i.sig === 'Lose' ? 'dn' : 'mut';
       const tr = el('tr', { tabindex: '0', title: 'Open details' },
-        el('td', { class: 'nm' }, starBtn(i.n), i.n, sub ? el('small', { text: sub }) : null),
+        el('td', { class: 'nm' }, starBtn(i.n), icon(i.n), i.n, sub ? el('small', { text: sub }) : null),
         el('td', { class: 'mut', text: i.c }),
         el('td', { class: 'mono', title: altP(i.p), text: fmtP(i.p) }),
         el('td', { class: 'mono ' + cls(i.c1), text: pct(i.c1) }),
@@ -692,28 +703,49 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
   async function loadInfo() { if (INFO === undefined) { try { INFO = await fetch('data/info.json?t=' + (M ? M.generatedAt : ''), { cache: 'no-store' }).then((r) => r.ok ? r.json() : null); } catch (e) { INFO = null; } } return INFO; }
   const pdbUrl = (n) => 'https://poedb.tw/us/' + encodeURIComponent(n.replace(/ /g, '_'));
   const ext = (href, text) => el('a', { href, target: '_blank', rel: 'noopener noreferrer', text });
+  // official item art from GGG's CDN (paths come from poe.ninja, saved hourly in icons.json)
+  let ICONS = null;
+  async function loadIcons() { try { ICONS = await fetch('data/icons.json?t=' + (M ? M.generatedAt : ''), { cache: 'no-store' }).then((r) => r.ok ? r.json() : null); } catch (e) { ICONS = null; } return ICONS; }
+  const iconUrl = (n) => { const u = ICONS && ICONS[n.replace(/ #\d+$/, '')]; return u ? (u.startsWith('http') ? u : 'https://web.poecdn.com' + u) : null; };
+  const icon = (n) => { const u = iconUrl(n); return u ? el('img', { class: 'ico', src: u, alt: '', loading: 'lazy', decoding: 'async' }) : null; };
+
   async function renderAbout(host, i) {
-    host.replaceChildren(el('div', { class: 'about mut', text: 'Loading item info…' }));
-    const all = await loadInfo(); const e = all && all[i.n];
-    const box = el('div', { class: 'about' });
-    if (!e) { box.append(el('div', { class: 'mut', text: all ? 'No description for this item yet.' : 'Item info is not available right now.' })); host.replaceChildren(box); return; }
-    const head = [e.cls, e.base && e.base !== i.n ? e.base : null, e.lvl ? 'Requires level ' + e.lvl : null, e.set ? 'Set of ' + e.set : null, e.stack ? 'Stacks to ' + e.stack : null].filter(Boolean).join(' · ');
-    box.append(el('div', { class: 'ah' }, el('b', { text: e.k === 'u' ? 'What this unique does' : e.k === 'card' ? 'What this card gives' : 'What this item does' }), head ? el('span', { text: head }) : null));
-    let any = false;
-    if (e.k === 'u') {
-      if (e.imp && e.imp.length) { box.append(el('div', { class: 'imp' }, ...e.imp.map((t) => el('div', { text: t })))); any = true; }
-      (e.exp || []).forEach(([t, opt]) => { box.append(el('div', { class: 'mod' + (opt ? ' opt' : ''), text: t })); any = true; });
-    } else if (e.k === 'card') {
-      if (e.rew && e.rew.length) { box.append(el('div', {}, el('span', { class: 'mut', text: 'Turn in a full set for: ' }), el('span', { class: 'rew', text: e.rew.join(' · ') }))); any = true; }
+    host.replaceChildren(el('div', { class: 'mut', style: 'font-size:12px', text: 'Loading item info…' }));
+    const [all] = await Promise.all([loadInfo(), ICONS ? ICONS : loadIcons()]);
+    const e = (all && all[i.n]) || {};
+    const kind = e.k === 'u' ? 'u' : e.k === 'card' ? 'card' : 'cur';
+    const name = i.g === 'Uniques' ? (i.un || i.n.replace(/ \(\dL\)/, '').replace(/ \[.*\]$/, '').replace(/ #\d+$/, '')) : i.n;
+    const parts = [];   // groups of lines, separated like in game
+    const prop = (t) => { const m = t.match(/^([^:]{1,40}):\s*(.+)$/); return el('div', { class: 'pr' }, ...(m ? [m[1] + ': ', el('b', { text: m[2] })] : [t])); };
+    if (kind === 'u') {
+      const g = [];
+      if (i.l) g.push(prop('Sockets: ' + i.l + '-link'));
+      if (e.lvl) g.push(el('div', { class: 'pr' }, 'Requires Level ', el('b', { text: e.lvl })));
+      if (g.length) parts.push(g);
+      if (e.imp && e.imp.length) parts.push(e.imp.map((t) => el('div', { class: 'md', text: t })));
+      if (e.exp && e.exp.length) parts.push(e.exp.map(([t, o]) => el('div', { class: 'md' + (o ? ' opt' : ''), text: t })));
+      if (e.fl) parts.push([el('div', { class: 'fl', text: e.fl })]);
+    } else if (kind === 'card') {
+      parts.push([el('div', { class: 'pr' }, 'Stack Size: ', el('b', { text: '1 / ' + (e.set || '?') }))]);
+      if (e.rew && e.rew.length) parts.push(e.rew.map((t) => el('div', { class: 'rw', text: t })));
+      if (e.fl) parts.push([el('div', { class: 'fl', text: e.fl })]);
     } else {
-      (e.eff || []).forEach((t) => { box.append(el('div', { class: 'eff', text: t })); any = true; });
-      (e.props || []).forEach((t) => { box.append(el('div', { class: 'prop', text: t })); any = true; });
-      (e.use || []).forEach((t) => { box.append(el('div', { class: 'use', text: t })); any = true; });
+      const g = [];
+      if (e.stack) g.push(el('div', { class: 'pr' }, 'Stack Size: ', el('b', { text: '1 / ' + e.stack })));
+      (e.props || []).forEach((t) => g.push(prop(t)));
+      if (g.length) parts.push(g);
+      if (e.eff && e.eff.length) parts.push(e.eff.map((t) => el('div', { class: 'md', text: t })));
+      if (e.use && e.use.length) parts.push(e.use.map((t) => el('div', { class: 'us', text: t })));
     }
-    if (!any) box.append(el('div', { class: 'mut', text: 'No description for this item yet.' }));
-    if (e.fl) box.append(el('div', { class: 'fl', text: e.fl }));
-    box.append(el('div', { class: 'lk' }, e.pdb ? ext(pdbUrl(e.pdb), 'Full details on poedb ↗') : el('span', { class: 'dim', text: 'Not found on poedb' })));
-    host.replaceChildren(box);
+    if (!parts.length) parts.push([el('div', { class: 'us', text: 'No description for this item yet.' })]);
+    const bd = el('div', { class: 'bd' }); parts.forEach((g, k) => { if (k) bd.append(el('div', { class: 'sep' })); bd.append(...g); });
+    if (kind === 'u' && e.exp && e.exp.some((x) => x[1])) bd.append(el('div', { class: 'sep' }), el('div', { class: 'ft', text: '* only on some versions of this item' }));
+    const tip = el('div', { class: 'ptip ' + kind, role: 'group', 'aria-label': 'In-game description' },
+      el('div', { class: 'hd' }, el('div', { class: 'n', text: name }), kind === 'u' && e.base ? el('div', { class: 'b', text: e.base }) : null), bd);
+    const u = iconUrl(i.n);
+    host.replaceChildren(el('div', { class: 'about' },
+      u ? el('div', { class: 'art' }, el('img', { src: u, alt: name, decoding: 'async' })) : null,
+      el('div', { class: 'side' }, tip, el('div', { class: 'lk' }, e.pdb ? ext(pdbUrl(e.pdb), 'Full details on poedb ↗') : el('span', { class: 'dim', text: 'Not on poedb' })))));
   }
 
   // ---------------------------------------------------------------- drawer
@@ -849,7 +881,7 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
         inp.addEventListener('change', () => { x[key] = inp.value.trim(); tsave(); updateBadge(); trkLater(); }); return inp; };
       const hit = alertHit(x, i), sc = i.sig === 'Gain' ? 'up' : i.sig === 'Lose' ? 'dn' : 'mut';
       const tr = el('tr', { class: hit ? 'hit' : '' },
-        el('td', { class: 'nm' }, el('button', { class: 'nmlink', type: 'button', title: 'Open details', text: x.n, onclick: () => openDrawer(i) }), el('small', { text: i.unit ? 'Prices are quoted in chaos' : x.n === 'Divine Orb' ? 'Moves shown in chaos' : i.c })),
+        el('td', { class: 'nm' }, icon(x.n), el('button', { class: 'nmlink', type: 'button', title: 'Open details', text: x.n, onclick: () => openDrawer(i) }), el('small', { text: i.unit ? 'Prices are quoted in chaos' : x.n === 'Divine Orb' ? 'Moves shown in chaos' : i.c })),
         el('td', {}, qIn),
         el('td', { class: 'mono', title: altP(i.p), text: x.n === 'Divine Orb' ? fmtC(i.p) + 'c' : fmtP(i.p) }),
         el('td', { class: 'mono ' + cls(i.c1), text: pct(i.c1) }),
@@ -916,7 +948,7 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
     AC.items = scored.slice(0, 10).map((x) => x[0]); AC.sel = AC.items.length ? 0 : -1;
     const hl = (n) => { const k = n.toLowerCase().indexOf(q); return [n.slice(0, k), el('mark', { text: n.slice(k, k + q.length) }), n.slice(k + q.length)]; };
     ul.replaceChildren(...(AC.items.length ? AC.items.map((n, k) => { const i = getItem(n);
-      const li = el('li', { role: 'option', id: 'ac' + k, 'aria-selected': k === AC.sel }, el('b', {}, ...hl(n)), el('small', { text: isTracked(n) ? 'tracked' : i ? i.c : '' }), el('span', { text: i ? (n === 'Divine Orb' ? fmtC(i.p) + 'c' : fmtP(i.p)) : '' }));
+      const li = el('li', { role: 'option', id: 'ac' + k, 'aria-selected': k === AC.sel }, icon(n), el('b', {}, ...hl(n)), el('small', { text: isTracked(n) ? 'tracked' : i ? i.c : '' }), el('span', { text: i ? (n === 'Divine Orb' ? fmtC(i.p) + 'c' : fmtP(i.p)) : '' }));
       li.addEventListener('mousedown', (e) => { e.preventDefault(); acPick(n); }); return li; })
       : [el('li', { class: 'none', text: 'No priced item matches' })]));
     ul.hidden = false; $('#trkQ').setAttribute('aria-expanded', 'true');

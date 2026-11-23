@@ -66,6 +66,7 @@ REPOE_URLS = [   # community game-data export: metadata id -> item name
     "https://raw.githubusercontent.com/lvlvllvlvllvlvl/RePoE/master/RePoE/data/base_items.min.json",
 ]
 META_NAMES = {}  # filled by load_meta_names()
+ICONS = {}       # item name -> GGG CDN image path (from poe.ninja)
 META_INFO = {}   # item name -> RePoE properties (description, directions, stack size) and item class
 POEDB_FILE = os.environ.get("POEDB_FILE", "data/poedb.json")
 MIN_FX_HOUR_VOLUME = 20  # chaos; below this an hourly Faustus price is ignored
@@ -100,6 +101,8 @@ def fetch_all():
             continue
         names = {i["id"]: i["name"] for i in (j.get("items") or [])}
         for i in j.get("items") or []:
+            if i.get("image") and i.get("name"):
+                ICONS.setdefault(i["name"], i["image"])
             art = os.path.splitext(os.path.basename(i.get("image") or ""))[0]
             if art:
                 ART_NAMES.setdefault(art, set()).add(i["name"])
@@ -127,6 +130,9 @@ def fetch_all():
                 name += f" ({l['links']}L)"
             if l.get("variant"):
                 name += f" [{l['variant']}]"
+            if l.get("icon"):
+                ICONS.setdefault(name, l["icon"])
+                ICONS.setdefault(l["name"], l["icon"])
             spark = (l.get("sparkLine") or {}).get("data") or []
             if not any(x is not None for x in spark):
                 spark = (l.get("lowConfidenceSparkLine") or {}).get("data") or []
@@ -679,6 +685,13 @@ if __name__ == "__main__":
         load_meta_names()
     with open(f"{out_dir}/info.json", "w") as fh:
         json.dump(build_info(recs, market), fh, ensure_ascii=False, separators=(",", ":"))
+    if ICONS:   # skipped for offline fixture builds, so an old icons.json is not overwritten with nothing
+        cdn = "https://web.poecdn.com"
+        names = {it["n"] for it in market["items"]} | {"Divine Orb", "Chaos Orb"}
+        icons = {n: (u[len(cdn):] if u.startswith(cdn) else u) for n, u in ICONS.items() if n in names}
+        with open(f"{out_dir}/icons.json", "w") as fh:
+            json.dump(icons, fh, ensure_ascii=False, separators=(",", ":"))
+        print(f"icons: {len(icons)}")
     with open(f"{out_dir}/hourly.json", "w") as fh:
         json.dump({"generatedAt": market["generatedAt"], "fxv": FX_VERSION, "nj": nj, "fx": fx}, fh, separators=(",", ":"))
     c = Counter((it["g"], it["sig"]) for it in market["items"])
