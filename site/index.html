@@ -166,6 +166,10 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
   </nav>
   <div class="ticker" id="ticker"><span class="skel">Loading prices…</span></div>
   <div class="topR">
+    <div class="seg" id="unitSw" role="group" aria-label="Show prices in">
+      <button type="button" data-v="div" aria-pressed="true" title="Anything worth 1 Divine or more is shown in Divines, prices and charts">Divine</button>
+      <button type="button" data-v="c" aria-pressed="false" title="Show every price and chart in chaos">Chaos</button>
+    </div>
     <span id="stamp">—</span>
     <button class="btn" id="refresh" type="button" title="Load the newest prices the hourly job has published">↻ Refresh</button>
   </div>
@@ -283,7 +287,7 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
   <div class="grid2" id="trkPanels">
     <section class="panel">
       <h3>Worth of your holdings · last 7 days and next 7</h3>
-      <p class="cap">Today's quantities valued at each day's prices, in Divines. Dashed lines: the three 7-day predictions.</p>
+      <p class="cap">Today's quantities valued at each day's prices, in <span id="trkUnit">Divines</span>. Dashed lines: the three 7-day predictions.</p>
       <div class="legend"><span><i class="sw"></i>Actual</span><span><i class="sw d"></i>Current trend</span><span><i class="sw d" style="border-color:#7aa2f7"></i>Like past leagues</span><span><i class="sw d" style="border-color:#3ecf8e"></i>Call</span></div>
       <div class="chart" id="trkChart" style="min-height:200px"></div>
     </section>
@@ -328,7 +332,17 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 
   const divRate = () => M ? (M.divine.h || []).filter((x) => x != null).slice(-1)[0] : null;
   const fmtD = (d) => d >= 100 ? d3.format(',.0f')(d) : d >= 10 ? d3.format('.1f')(d) : d3.format('.2f')(d);
-  const isDiv = (p) => { const r = divRate(); return r && p != null && p >= r; };
+  let U = 'div'; try { if (localStorage.getItem('em-unit') === 'c') U = 'c'; } catch (e) {}
+  const isDiv = (p) => { const r = divRate(); return U === 'div' && r && p != null && p >= r; };
+  const fmtDv = (v) => v == null || isNaN(v) ? '—' : v >= 100 ? d3.format(',.0f')(v) : d3.format('.3~r')(v);
+  // a chart for this item is drawn in Divines when the switch says so and the item is worth 1 Divine or more
+  const chartInDiv = (i) => i && i.n !== 'Divine Orb' && !i.unit && isDiv(i.p);
+  const fillNN = (arr, fb) => (arr || []).map((v, k, a) => v ?? a.slice(k).find((y) => y != null) ?? [...a.slice(0, k)].reverse().find((y) => y != null) ?? fb);
+  // Divine price at each hourly timestamp (nearest hour we have), so old points convert at the rate of their own hour
+  function hourRates(t) {
+    const ds = seriesFor('Divine Orb'); const pts = ds ? ds.t.map((ts, k) => [+new Date(ts), ds.s[k]]).filter((q) => q[1] != null) : [];
+    return t.map((ts) => { const x = +new Date(ts); if (!pts.length) return divRate(); return pts.reduce((a, b) => Math.abs(b[0] - x) < Math.abs(a[0] - x) ? b : a)[1]; });
+  }
   // items worth a Divine or more are shown in Divines, cheaper ones in chaos
   const fmtP = (p) => isDiv(p) ? fmtD(p / divRate()) + ' div' : fmtC(p) + 'c';
   const altP = (p) => isDiv(p) ? `≈ ${fmtC(p)}c` : (divRate() && p != null && p >= 1 ? `≈ ${d3.format('.2~r')(p / divRate())} div` : '');
@@ -509,18 +523,20 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
   // ---------------------------------------------------------------- charts
   function hourlyChart(host, { t, s, lo, hi, v }, opts = {}) {
     host.replaceChildren();
-    const pts = t.map((ts, k) => ({ t: new Date(ts), p: s[k], lo: lo ? lo[k] : null, hi: hi ? hi[k] : null, v: v ? v[k] : null })).filter((d) => d.p != null);
+    const rt = opts.div ? hourRates(t) : null, cv = (x, k) => x == null ? null : rt ? (rt[k] ? x / rt[k] : null) : x;
+    const fmtY = rt ? fmtDv : fmtC, suf = rt ? ' div' : 'c';
+    const pts = t.map((ts, k) => ({ t: new Date(ts), p: cv(s[k], k), lo: lo ? cv(lo[k], k) : null, hi: hi ? cv(hi[k], k) : null, v: v ? v[k] : null })).filter((d) => d.p != null);
     if (pts.length < 2) { host.append(el('div', { class: 'empty', text: 'Not enough hourly history yet.' })); return; }
     const W = Math.max(280, host.clientWidth), Hh = opts.h || 200, m = { t: 8, r: 10, b: 24, l: 10 };
     const svg = d3.select(host).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${Hh}`).attr('role', 'img').attr('aria-label', opts.aria || 'Hourly price chart');
     const yMin = d3.min(pts, (d) => d.lo ?? d.p), yMax = d3.max(pts, (d) => d.hi ?? d.p);
     const y = d3.scaleLinear().domain([yMin, yMax]).nice(4);
-    const probe = svg.append('text').attr('class', 'tick').append('tspan').text(fmtC(y.domain()[1])); const tw = probe.node().getComputedTextLength(); probe.node().parentNode.remove();
+    const probe = svg.append('text').attr('class', 'tick').append('tspan').text(fmtY(y.domain()[1])); const tw = probe.node().getComputedTextLength(); probe.node().parentNode.remove();
     m.l = Math.ceil(tw) + 12;
     const x = d3.scaleUtc().domain(d3.extent(pts, (d) => d.t)).range([m.l, W - m.r]);
     const volH = v ? 40 : 0; y.range([Hh - m.b - volH, m.t]);
     svg.append('g').attr('class', 'grid').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickSize(-(W - m.l - m.r)).tickFormat(''));
-    svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickFormat(fmtC)).call((g) => g.select('.domain').remove());
+    svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickFormat(fmtY)).call((g) => g.select('.domain').remove());
     svg.append('g').attr('transform', `translate(0,${Hh - m.b})`).call(d3.axisBottom(x).ticks(W < 450 ? 4 : 8).tickFormat(d3.utcFormat('%d %H:%M')));
     if (v) { const vy = d3.scaleLinear().domain([0, d3.max(pts, (d) => d.v || 0) || 1]).range([0, volH - 6]); const bw = Math.max(1, (W - m.l - m.r) / pts.length - 1);
       svg.append('g').selectAll('rect').data(pts).join('rect').attr('x', (d) => x(d.t) - bw / 2).attr('width', bw).attr('y', (d) => Hh - m.b - vy(d.v || 0)).attr('height', (d) => vy(d.v || 0)).attr('fill', '#2b3039'); }
@@ -532,7 +548,7 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
       .on('pointermove', (ev) => { const [mx] = d3.pointer(ev); const d = pts.reduce((a, b) => Math.abs(x(b.t) - mx) < Math.abs(x(a.t) - mx) ? b : a);
         dot.style('display', null).attr('cx', x(d.t)).attr('cy', y(d.p)); tip.style('display', null).selectAll('*').remove();
         tip.append('div').attr('class', 'mut').text(d3.utcFormat('%-d %b %H:00 UTC')(d.t));
-        tip.append('div').text(fmtC(d.p) + 'c' + (d.lo != null ? `  (${fmtC(d.lo)}–${fmtC(d.hi)})` : ''));
+        tip.append('div').text(fmtY(d.p) + suf + (d.lo != null ? `  (${fmtY(d.lo)}–${fmtY(d.hi)})` : ''));
         if (d.v != null) tip.append('div').attr('class', 'mut').text('traded ' + short(d.v) + 'c');
         const tw2 = tip.node().offsetWidth, sx = x(d.t) / W * host.clientWidth; tip.style('left', Math.max(0, Math.min(host.clientWidth - tw2, sx - tw2 / 2)) + 'px').style('top', '0px'); })
       .on('pointerleave', () => { tip.style('display', 'none'); dot.style('display', 'none'); });
@@ -549,21 +565,24 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
   function dailyChart(host, item) {
     host.replaceChildren();
     const days = M.days.map((d) => d3.utcParse('%Y-%m-%d')(d)), fdays = M.fdays.map((d) => d3.utcParse('%Y-%m-%d')(d));
-    const act = item.h.map((p, k) => ({ t: days[k], p })).filter((d) => d.p != null);
+    const dv = chartInDiv(item), D = M.divine, dh = fillNN(D.h, divRate());
+    const fmtY = dv ? fmtDv : fmtC;
+    const cv = (p, rate) => p == null ? null : dv ? (rate ? p / rate : null) : p;
+    const act = item.h.map((p, k) => ({ t: days[k], p: cv(p, dh[k]) })).filter((d) => d.p != null);
     if (act.length < 1) return;
-    const mk = (arr) => arr ? [act[act.length - 1], ...arr.map((p, k) => ({ t: fdays[k], p })).filter((d) => d.p != null)] : null;
-    const fc = mk(item.tp || item.f), fh = mk(item.hpth);
-    const all = [...act, ...fc, ...(fh || [])]; const W = Math.max(280, host.clientWidth), Hh = 170, m = { t: 8, r: 10, b: 24, l: 10 };
+    const mk = (arr, rates) => arr ? [act[act.length - 1], ...arr.map((p, k) => ({ t: fdays[k], p: cv(p, (rates || [])[k]) })).filter((d) => d.p != null)] : null;
+    const fc = mk(item.tp || item.f, D.ft || D.f), fh = mk(item.hpth, D.fh || D.f);
+    const all = [...act, ...(fc || []), ...(fh || [])]; const W = Math.max(280, host.clientWidth), Hh = 170, m = { t: 8, r: 10, b: 24, l: 10 };
     const svg = d3.select(host).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${Hh}`).attr('role', 'img').attr('aria-label', 'Daily price and 7-day forecast');
     const y = d3.scaleLinear().domain([0, d3.max(all, (d) => d.p) * 1.05]).nice(4);
-    const probe = svg.append('text').attr('class', 'tick').append('tspan').text(fmtC(y.domain()[1])); m.l = Math.ceil(probe.node().getComputedTextLength()) + 12; probe.node().parentNode.remove();
+    const probe = svg.append('text').attr('class', 'tick').append('tspan').text(fmtY(y.domain()[1])); m.l = Math.ceil(probe.node().getComputedTextLength()) + 12; probe.node().parentNode.remove();
     const x = d3.scaleUtc().domain(d3.extent(all, (d) => d.t)).range([m.l, W - m.r]); y.range([Hh - m.b, m.t]);
     svg.append('g').attr('class', 'grid').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickSize(-(W - m.l - m.r)).tickFormat(''));
-    svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickFormat(fmtC)).call((g) => g.select('.domain').remove());
+    svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickFormat(fmtY)).call((g) => g.select('.domain').remove());
     svg.append('g').attr('transform', `translate(0,${Hh - m.b})`).call(d3.axisBottom(x).ticks(W < 450 ? 4 : 7).tickFormat(d3.utcFormat('%-d %b')));
     const line = d3.line().x((d) => x(d.t)).y((d) => y(d.p));
     svg.append('path').datum(act).attr('fill', 'none').attr('stroke', ACC).attr('stroke-width', 2.2).attr('d', line);
-    svg.append('path').datum(fc).attr('fill', 'none').attr('stroke', ACC).attr('stroke-width', 1.8).attr('stroke-dasharray', '5 4').attr('d', line);
+    if (fc) svg.append('path').datum(fc).attr('fill', 'none').attr('stroke', ACC).attr('stroke-width', 1.8).attr('stroke-dasharray', '5 4').attr('d', line);
     if (fh) svg.append('path').datum(fh).attr('fill', 'none').attr('stroke', '#7aa2f7').attr('stroke-width', 1.8).attr('stroke-dasharray', '5 4').attr('d', line);
     svg.append('g').selectAll('circle').data(act).join('circle').attr('cx', (d) => x(d.t)).attr('cy', (d) => y(d.p)).attr('r', 3).attr('fill', ACC);
   }
@@ -654,9 +673,10 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
   }
   // ---------------------------------------------------------------- drawer
   let lastFocus = null;
-  function closeDrawer() { $('#drawerHost').replaceChildren(); document.body.style.overflow = ''; if (lastFocus) lastFocus.focus(); }
-  function openDrawer(i) {
-    lastFocus = document.activeElement;
+  function closeDrawer() { drawerItem = null; $('#drawerHost').replaceChildren(); document.body.style.overflow = ''; if (lastFocus) lastFocus.focus(); }
+  let drawerItem = null;
+  function openDrawer(i, keepFocus) {
+    if (!keepFocus) lastFocus = document.activeElement; drawerItem = i;
     const stat = (k, v, c) => el('div', { class: 'stat' }, el('div', { class: 'k', text: k }), el('div', { class: 'v ' + (c || ''), text: v }));
     const hourHost = el('div', { class: 'chart', style: 'min-height:200px' }), dayHost = el('div', { class: 'chart', style: 'min-height:170px' }), cmpHost = el('div', { style: 'min-height:260px' });
     const closeBtn = el('button', { class: 'btn2 x', type: 'button', 'aria-label': 'Close details', text: '✕', onclick: closeDrawer });
@@ -665,7 +685,7 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
       closeBtn,
       el('div', {}, el('div', { class: 'mut', style: 'font-size:12px', text: [i.c, i.s, i.l ? i.l + '-link' : null].filter(Boolean).join(' · ') }), el('h2', { text: i.n }),
         el('div', { class: 'mono', style: 'font-size:28px;margin-top:4px' }, fmtP(i.p) + ' ', el('span', { class: 'mut', style: 'font-size:14px', text: altP(i.p) })),
-        el('div', { style: 'margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center' }, drawerTrackBtn(i), i.g === 'Uniques' ? tradeLink(i, 'Search on official trade ↗') : null)),
+        el('div', { style: 'margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center' }, drawerTrackBtn(i), i.g === 'Uniques' ? tradeLink(i, 'Search on official trade ↗') : null, unitSeg())),
       el('div', { class: 'stats' }, stat('1h', pct(i.c1), cls(i.c1)), stat('6h', pct(i.c6), cls(i.c6)), stat('24h', pct(v24(i)), cls(v24(i))),
         stat('Since first traded', pct(i.chg), cls(i.chg)),
         stat('7 days · current trend', pct(i.ft), cls(i.ft)),
@@ -676,14 +696,15 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
         null),
       callNote(i),
       el('section', {}, el('h3', { style: 'margin:6px 0 2px;font-size:14px', text: 'Hourly · last 48h' }),
-        el('p', { class: 'mut', style: 'font-size:12px;margin:0 0 8px', text: sr && sr.src === 'fx' ? 'Faustus trades: line = volume-weighted price, band = low–high rate, bars = Chaos traded' : 'poe.ninja hourly snapshots' }), hourHost),
-      el('section', {}, el('h3', { style: 'margin:6px 0 2px;font-size:14px', text: 'Daily · since league start + both 7-day predictions' }),
+        el('p', { class: 'mut', style: 'font-size:12px;margin:0 0 8px', text: (sr && sr.src === 'fx' ? 'Faustus trades: line = volume-weighted price, band = low–high rate, bars = Chaos traded' : 'poe.ninja hourly snapshots') + (chartInDiv(i) ? '. Prices in Divines, at each hour\'s Divine rate.' : '. Prices in chaos.') }), hourHost),
+      el('section', {}, el('h3', { style: 'margin:6px 0 2px;font-size:14px', text: 'Daily · since league start + both 7-day predictions' + (chartInDiv(i) ? ' · in Divines' : ' · in chaos') }),
         el('div', { class: 'legend' }, el('span', {}, el('i', { class: 'sw' }), 'Actual'), el('span', {}, el('i', { class: 'sw d' }), 'Current trend'), el('span', {}, el('i', { class: 'sw d', style: 'border-color:#7aa2f7' }), 'Like past leagues')), dayHost),
       el('section', {}, el('h3', { style: 'margin:6px 0 2px;font-size:14px', text: 'Compare with past leagues' }), cmpHost));
     $('#drawerHost').replaceChildren(el('div', { class: 'scrim', onclick: closeDrawer }), d);
     document.body.style.overflow = 'hidden';
     closeBtn.focus();
-    requestAnimationFrame(() => { if (sr) hourlyChart(hourHost, sr, { aria: i.n + ' hourly price' }); else hourHost.append(el('div', { class: 'empty', text: H ? 'No hourly history for this item yet.' : 'Loading hourly data…' })); dailyChart(dayHost, i); renderCompare(cmpHost, i); });
+    CMP.unit = chartInDiv(i) ? 'd' : 'c';
+    requestAnimationFrame(() => { if (sr) hourlyChart(hourHost, sr, { aria: i.n + ' hourly price', div: chartInDiv(i) }); else hourHost.append(el('div', { class: 'empty', text: H ? 'No hourly history for this item yet.' : 'Loading hourly data…' })); dailyChart(dayHost, i); renderCompare(cmpHost, i); });
   }
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#drawerHost').children.length) closeDrawer(); });
 
@@ -731,6 +752,7 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
   function tRows() { return T.items.map((x) => ({ x, i: getItem(x.n) })); }
   const tval = (r, k) => { const { x, i } = r; if (k === 'q') return x.q; if (k === 'n') return x.n; if (!i) return null; if (k === 'val') return x.q * i.p; return val(i, k); };
   const fmtWorthD = (d) => d == null || isNaN(d) ? '—' : (d >= 1000 ? d3.format(',.0f')(d) : d >= 10 ? d3.format(',.1f')(d) : d3.format(',.2f')(d)) + ' div';
+  const fmtWorthC = (c) => c == null || isNaN(c) ? '—' : d3.format(',.0f')(c) + 'c';
 
   function renderTracker() {
     if (!M) return;
@@ -750,10 +772,11 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
     const lose = held.filter(({ i }) => i.sig === 'Lose').sort((a, b) => b.x.q * b.i.p - a.x.q * a.i.p), hits = rows.filter(({ x, i }) => alertHit(x, i));
     const k = (label, value, sub, c) => el('div', { class: 'kpi' }, el('div', { class: 'k', text: label }), el('div', { class: 'v ' + (c || ''), text: value }), el('div', { class: 's', text: sub }));
     const ch24 = pctTo(pastD, nowD), chF = pctTo(nowD, fCall);
+    const wF = (dv2, rate) => U === 'c' ? fmtWorthC(dv2 != null && rate ? dv2 * rate : null) : fmtWorthD(dv2);
     $('#trkKpis').replaceChildren(
-      k('Net worth', held.length ? fmtWorthD(nowD) : '—', held.length ? `≈ ${d3.format(',.0f')(now)}c · ${held.length} holding${held.length > 1 ? 's' : ''}` : 'Enter how many you hold to see your worth'),
+      k('Net worth', held.length ? (U === 'c' ? fmtWorthC(now) : fmtWorthD(nowD)) : '—', held.length ? `≈ ${U === 'c' ? fmtWorthD(nowD) : fmtWorthC(now)} · ${held.length} holding${held.length > 1 ? 's' : ''}` : 'Enter how many you hold to see your worth'),
       k('Last 24h', held.length ? pct(ch24) : '—', held.length && nowD != null && pastD != null ? `${nowD >= pastD ? '+' : '−'}${fmtWorthD(Math.abs(nowD - pastD))} in Divine terms` : 'Change in what your holdings are worth', held.length ? cls(ch24) : ''),
-      k('In 7 days · Call', held.length ? fmtWorthD(fCall) : '—', held.length ? `${pct(chF)} · trend ${fmtWorthD(fTr)} · past leagues ${fmtWorthD(fPast)}` : 'Projected worth from the forecasts', held.length ? cls(chF) : ''),
+      k('In 7 days · Call', held.length ? wF(fCall, (d.f || [])[6]) : '—', held.length ? `${pct(chF)} · trend ${wF(fTr, (d.ft || d.f || [])[6])} · past leagues ${wF(fPast, (d.fh || d.f || [])[6])}` : 'Projected worth from the forecasts', held.length ? cls(chF) : ''),
       k('Watch', `${hits.length} alert${hits.length === 1 ? '' : 's'}`, lose.length ? `Call says Lose: ${lose.slice(0, 2).map((z) => z.x.n).join(', ')}${lose.length > 2 ? ` +${lose.length - 2}` : ''}` : 'No holdings with a Lose call', hits.length ? 'acc' : ''));
     // ---- allocation
     const top = held.map(({ x, i }) => ({ n: x.n, v: x.q * i.p })).sort((a, b) => b.v - a.v); const shown2 = top.slice(0, 7), rest = d3.sum(top.slice(7), (z) => z.v);
@@ -791,6 +814,7 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
       tr.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target === tr) openDrawer(i); });
       return tr;
     }));
+    $('#trkUnit').textContent = U === 'c' ? 'chaos' : 'Divines';
     requestAnimationFrame(() => worthChart($('#trkChart'), held));
   }
 
@@ -805,12 +829,13 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
     const path = (key, rate) => { if (!rate) return null; return [act[act.length - 1], ...M.fdays.map((ds, j) => { const c = d3.sum(held, ({ x, i }) => x.q * ((i[key] || i.f || [])[j] ?? i.p)); return { t: P(ds), c, v: rate[j] ? c / rate[j] : null }; }).filter((p) => p.v != null)]; };
     const lines = [{ pts: act, col: ACC, dash: null, w: 2.2, lab: 'Actual' }, { pts: path('tp', d.ft || d.f), col: ACC, dash: '5 4', w: 1.8, lab: 'Trend' },
       { pts: path('hpth', d.fh), col: '#7aa2f7', dash: '5 4', w: 1.8, lab: 'Past leagues' }, { pts: path('f', d.f), col: UP, dash: '2 3', w: 1.8, lab: 'Call' }].filter((l) => l.pts && l.pts.length > 1);
+    if (U === 'c') lines.forEach((l) => { l.pts = l.pts.map((p) => ({ ...p, v: p.c })); });
     const all = lines.flatMap((l) => l.pts);
     const W = Math.max(280, host.clientWidth), Hh = 200, m = { t: 8, r: 10, b: 24, l: 10 };
     const svg = d3.select(host).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${Hh}`).attr('role', 'img').attr('aria-label', 'Worth of your holdings in Divines, last 7 days and 7-day predictions');
     const ext = d3.extent(all, (p) => p.v), pad = (ext[1] - ext[0]) * 0.08 || ext[1] * 0.05 || 1;
     const y = d3.scaleLinear().domain([Math.max(0, ext[0] - pad), ext[1] + pad]).nice(4);
-    const fy = (v) => fmtD(v);
+    const fy = (v) => U === 'c' ? fmtC(v) : fmtD(v);
     const probe = svg.append('text').attr('class', 'tick').append('tspan').text(fy(y.domain()[1])); m.l = Math.ceil(probe.node().getComputedTextLength()) + 12; probe.node().parentNode.remove();
     const x = d3.scaleUtc().domain(d3.extent(all, (p) => p.t)).range([m.l, W - m.r]); y.range([Hh - m.b, m.t]);
     svg.append('g').attr('class', 'grid').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickSize(-(W - m.l - m.r)).tickFormat(''));
@@ -825,7 +850,7 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
     svg.append('rect').attr('x', m.l).attr('width', W - m.l - m.r).attr('height', Hh).attr('fill', 'transparent')
       .on('pointermove', (ev) => { const [mx] = d3.pointer(ev); const t = days.reduce((a, b) => Math.abs(x(b) - mx) < Math.abs(x(a) - mx) ? b : a);
         tip.style('display', null).selectAll('*').remove(); tip.append('div').attr('class', 'mut').text(d3.utcFormat('%-d %b')(new Date(t)) + (t > +today ? ' · forecast' : t === +today ? ' · today' : ''));
-        lines.forEach((l) => { const p = l.pts.find((q) => +q.t === t); if (p && !(l.lab !== 'Actual' && t === +today)) tip.append('div').style('color', l.col).text(`${l.lab}: ${fmtWorthD(p.v)} (${d3.format(',.0f')(p.c)}c)`); });
+        lines.forEach((l) => { const p = l.pts.find((q) => +q.t === t); if (p && !(l.lab !== 'Actual' && t === +today)) tip.append('div').style('color', l.col).text(`${l.lab}: ${U === 'c' ? fmtWorthC(p.c) : fmtWorthD(p.v) + ` (${fmtWorthC(p.c)})`}`); });
         const tw = tip.node().offsetWidth, sx = x(t) / W * host.clientWidth; tip.style('left', Math.max(0, Math.min(host.clientWidth - tw, sx + 12)) + 'px').style('top', '0px'); })
       .on('pointerleave', () => tip.style('display', 'none'));
   }
@@ -867,6 +892,13 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
   }
   window.addEventListener('hashchange', setView);
   setView();
+
+  // ---------------------------------------------------------------- chaos / divine switch
+  function setUnit(v) { U = v; try { localStorage.setItem('em-unit', U); } catch (err) {} syncUnit(); if (!M) return; render(); if (drawerItem) openDrawer(drawerItem, true); }
+  function unitSeg() { return el('div', { class: 'seg', role: 'group', 'aria-label': 'Show prices in', style: 'margin-left:auto' }, ...[['div', 'Divine'], ['c', 'Chaos']].map(([v, l]) => el('button', { type: 'button', 'aria-pressed': U === v, onclick: () => setUnit(v) }, l))); }
+  function syncUnit() { $$('#unitSw button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === U)); }
+  on('#unitSw button', 'click', (e) => setUnit(e.currentTarget.dataset.v));
+  syncUnit();
 
   // ---------------------------------------------------------------- refresh
   $('#refresh').addEventListener('click', async (e) => {
