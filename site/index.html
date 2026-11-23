@@ -152,6 +152,15 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .alloc .bar2{height:10px;background:#1d2128;border-radius:3px;overflow:hidden}.alloc .bar2 i{display:block;height:100%;background:var(--accent);border-radius:3px}
 .alloc .r span:last-child{text-align:right;font-family:var(--mono);color:var(--muted)}
 .note{font-size:12px;color:var(--muted)}
+.about{background:#0b0d10;border:1px solid var(--line2);border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.55}
+.about .ah{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:6px}
+.about .ah b{font-size:13px}.about .ah span{font-size:12px;color:var(--muted)}
+.about .mod{color:#9db4ff}.about .mod.opt{color:#7f8fbf}.about .mod.opt::after{content:' (some versions)';color:var(--dim);font-size:11px}
+.about .imp{color:#9db4ff;border-bottom:1px solid var(--line2);padding-bottom:6px;margin-bottom:6px}
+.about .eff{color:var(--fg)}.about .prop{color:var(--fg2)}.about .use{color:var(--muted);font-size:12px;margin-top:6px}
+.about .rew{color:var(--accent2);font-weight:600}
+.about .fl{color:#c8915a;font-style:italic;font-size:12px;margin-top:8px;white-space:pre-line}
+.about .lk{margin-top:8px;font-size:12px}
 </style>
 </head>
 <body>
@@ -374,7 +383,7 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
   async function load(first) {
     const j = await fetch('data/market.json?t=' + Date.now(), { cache: 'no-store' }).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
     const changed = !M || M.generatedAt !== j.generatedAt;
-    M = j; H = null;
+    M = j; H = null; if (changed) INFO = undefined;
     if (first || changed) { buildFilters(); render(); loadHourly(); }
     return changed;
   }
@@ -671,6 +680,35 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
         const tw = tip.node().offsetWidth, sx = x(d) / W * host.clientWidth; tip.style('left', Math.max(0, Math.min(host.clientWidth - tw, sx + 12)) + 'px').style('top', '0px'); })
       .on('pointerleave', () => { tip.style('display', 'none'); guide.style('display', 'none'); });
   }
+  // ---------------------------------------------------------------- item info (what each item is and does)
+  let INFO;   // undefined = not loaded, null = unavailable
+  async function loadInfo() { if (INFO === undefined) { try { INFO = await fetch('data/info.json?t=' + (M ? M.generatedAt : ''), { cache: 'no-store' }).then((r) => r.ok ? r.json() : null); } catch (e) { INFO = null; } } return INFO; }
+  const pdbUrl = (n) => 'https://poedb.tw/us/' + encodeURIComponent(n.replace(/ /g, '_'));
+  const ext = (href, text) => el('a', { href, target: '_blank', rel: 'noopener noreferrer', text });
+  async function renderAbout(host, i) {
+    host.replaceChildren(el('div', { class: 'about mut', text: 'Loading item info…' }));
+    const all = await loadInfo(); const e = all && all[i.n];
+    const box = el('div', { class: 'about' });
+    if (!e) { box.append(el('div', { class: 'mut', text: all ? 'No description for this item yet.' : 'Item info is not available right now.' })); host.replaceChildren(box); return; }
+    const head = [e.cls, e.base && e.base !== i.n ? e.base : null, e.lvl ? 'Requires level ' + e.lvl : null, e.set ? 'Set of ' + e.set : null, e.stack ? 'Stacks to ' + e.stack : null].filter(Boolean).join(' · ');
+    box.append(el('div', { class: 'ah' }, el('b', { text: e.k === 'u' ? 'What this unique does' : e.k === 'card' ? 'What this card gives' : 'What this item does' }), head ? el('span', { text: head }) : null));
+    let any = false;
+    if (e.k === 'u') {
+      if (e.imp && e.imp.length) { box.append(el('div', { class: 'imp' }, ...e.imp.map((t) => el('div', { text: t })))); any = true; }
+      (e.exp || []).forEach(([t, opt]) => { box.append(el('div', { class: 'mod' + (opt ? ' opt' : ''), text: t })); any = true; });
+    } else if (e.k === 'card') {
+      if (e.rew && e.rew.length) { box.append(el('div', {}, el('span', { class: 'mut', text: 'Turn in a full set for: ' }), el('span', { class: 'rew', text: e.rew.join(' · ') }))); any = true; }
+    } else {
+      (e.eff || []).forEach((t) => { box.append(el('div', { class: 'eff', text: t })); any = true; });
+      (e.props || []).forEach((t) => { box.append(el('div', { class: 'prop', text: t })); any = true; });
+      (e.use || []).forEach((t) => { box.append(el('div', { class: 'use', text: t })); any = true; });
+    }
+    if (!any) box.append(el('div', { class: 'mut', text: 'No description for this item yet.' }));
+    if (e.fl) box.append(el('div', { class: 'fl', text: e.fl }));
+    box.append(el('div', { class: 'lk' }, e.pdb ? ext(pdbUrl(e.pdb), 'Full details on poedb ↗') : el('span', { class: 'dim', text: 'Not found on poedb' })));
+    host.replaceChildren(box);
+  }
+
   // ---------------------------------------------------------------- drawer
   let lastFocus = null;
   function closeDrawer() { drawerItem = null; $('#drawerHost').replaceChildren(); document.body.style.overflow = ''; if (lastFocus) lastFocus.focus(); }
@@ -678,7 +716,7 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
   function openDrawer(i, keepFocus) {
     if (!keepFocus) lastFocus = document.activeElement; drawerItem = i;
     const stat = (k, v, c) => el('div', { class: 'stat' }, el('div', { class: 'k', text: k }), el('div', { class: 'v ' + (c || ''), text: v }));
-    const hourHost = el('div', { class: 'chart', style: 'min-height:200px' }), dayHost = el('div', { class: 'chart', style: 'min-height:170px' }), cmpHost = el('div', { style: 'min-height:260px' });
+    const aboutHost = el('div'), hourHost = el('div', { class: 'chart', style: 'min-height:200px' }), dayHost = el('div', { class: 'chart', style: 'min-height:170px' }), cmpHost = el('div', { style: 'min-height:260px' });
     const closeBtn = el('button', { class: 'btn2 x', type: 'button', 'aria-label': 'Close details', text: '✕', onclick: closeDrawer });
     const sr = seriesFor(i.n);
     const d = el('div', { class: 'drawer', role: 'dialog', 'aria-modal': 'true', 'aria-label': i.n + ' details' },
@@ -686,6 +724,7 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
       el('div', {}, el('div', { class: 'mut', style: 'font-size:12px', text: [i.c, i.s, i.l ? i.l + '-link' : null].filter(Boolean).join(' · ') }), el('h2', { text: i.n }),
         el('div', { class: 'mono', style: 'font-size:28px;margin-top:4px' }, fmtP(i.p) + ' ', el('span', { class: 'mut', style: 'font-size:14px', text: altP(i.p) })),
         el('div', { style: 'margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center' }, drawerTrackBtn(i), i.g === 'Uniques' ? tradeLink(i, 'Search on official trade ↗') : null, unitSeg())),
+      aboutHost,
       el('div', { class: 'stats' }, stat('1h', pct(i.c1), cls(i.c1)), stat('6h', pct(i.c6), cls(i.c6)), stat('24h', pct(v24(i)), cls(v24(i))),
         stat('Since first traded', pct(i.chg), cls(i.chg)),
         stat('7 days · current trend', pct(i.ft), cls(i.ft)),
@@ -704,6 +743,7 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
     document.body.style.overflow = 'hidden';
     closeBtn.focus();
     CMP.unit = chartInDiv(i) ? 'd' : 'c';
+    renderAbout(aboutHost, i);
     requestAnimationFrame(() => { if (sr) hourlyChart(hourHost, sr, { aria: i.n + ' hourly price', div: chartInDiv(i) }); else hourHost.append(el('div', { class: 'empty', text: H ? 'No hourly history for this item yet.' : 'Loading hourly data…' })); dailyChart(dayHost, i); renderCompare(cmpHost, i); });
   }
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#drawerHost').children.length) closeDrawer(); });

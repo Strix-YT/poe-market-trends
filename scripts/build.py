@@ -24,6 +24,7 @@ import datetime
 import json
 import math
 import os
+import re
 import sys
 import time
 import urllib.parse
@@ -65,6 +66,8 @@ REPOE_URLS = [   # community game-data export: metadata id -> item name
     "https://raw.githubusercontent.com/lvlvllvlvllvlvl/RePoE/master/RePoE/data/base_items.min.json",
 ]
 META_NAMES = {}  # filled by load_meta_names()
+META_INFO = {}   # item name -> RePoE properties (description, directions, stack size) and item class
+POEDB_FILE = os.environ.get("POEDB_FILE", "data/poedb.json")
 MIN_FX_HOUR_VOLUME = 20  # chaos; below this an hourly Faustus price is ignored
 FX_VERSION = 2   # bump when the Faustus name mapping changes, to rebuild cached hours
 UA = "poe-market-trends (github.com/Strix-YT/poe-market-trends; hourly)"
@@ -130,7 +133,10 @@ def fetch_all():
             recs.append(dict(group="Uniques", cat=label, name=name, base=l.get("baseType") or "", uname=l["name"],
                              sub=l.get("itemType") or l.get("baseType") or "",
                              links=l.get("links") or 0, price=float(l["chaosValue"]), volume=None,
-                             listings=int(l.get("listingCount") or 0), spark=spark))
+                             listings=int(l.get("listingCount") or 0), spark=spark,
+                             mods=dict(imp=[m.get("text") for m in l.get("implicitModifiers") or [] if m.get("text")],
+                                       exp=[[m.get("text"), bool(m.get("optional"))] for m in l.get("explicitModifiers") or [] if m.get("text")],
+                                       fl=l.get("flavourText") or "", lvl=l.get("levelRequired") or 0, cls=l.get("itemClass"))))
         time.sleep(0.5)
     # names must be unique keys
     seen = Counter()
@@ -197,6 +203,10 @@ def load_meta_names():
         for mid, b in data.items():
             if b.get("name"):
                 META_NAMES[mid] = b["name"]
+                pr = b.get("properties") or {}
+                old = META_INFO.get(b["name"])
+                if not old or (not (old.get("description") or old.get("directions")) and (pr.get("description") or pr.get("directions"))):
+                    META_INFO[b["name"]] = dict(pr, item_class=b.get("item_class") or "")
                 art = ((b.get("visual_identity") or {}).get("dds_file") or "").rsplit("/", 1)[-1].rsplit(".", 1)[0]
                 if art:
                     META_NAMES.setdefault("art:" + art, b["name"])
@@ -567,6 +577,71 @@ def load_prev_hourly():
         return {}
 
 
+# ----------------------------------------------------------------------------- item descriptions
+
+def repoe_text(s):
+    """RePoE text with markup like <currencyitem>{Mirror of Kalandra} reduced to plain lines."""
+    s = s or ""
+    for _ in range(4):
+        s = re.sub(r"<[^<>{}]*>\{([^{}]*)\}", r"\1", s)
+    s = re.sub(r"<[^<>]*>", "", s).replace("{", "").replace("}", "")
+    return [x.strip() for x in re.split(r"\r?\n", s) if x.strip()]
+
+
+CLASS_LABEL = {"StackableCurrency": "Stackable Currency", "MapFragment": "Map Fragment", "DivinationCard": "Divination Card",
+               "DelveSocketableCurrency": "Resonator", "DelveStackableSocketableCurrency": "Resonator", "MiscMapItem": "Map Item"}
+
+
+def build_info(recs, market):
+    """info.json: what each item is and does, for the item details panel."""
+    try:
+        pdb = json.load(open(POEDB_FILE, encoding="utf-8"))
+    except Exception as e:
+        print(f"note: no poedb cache ({e})", file=sys.stderr)
+        pdb = {}
+    mods = {r["name"]: r.get("mods") for r in recs if r.get("mods")}
+    out = {}
+    for it in market["items"] + [{"n": "Divine Orb", "g": "Exchange"}, {"n": "Chaos Orb", "g": "Exchange"}]:
+        n = it["n"]
+        e = {}
+        if it["g"] == "Uniques":
+            m = mods.get(n)
+            if m:
+                e = {"k": "u", "cls": m.get("cls") or it.get("s") or "", "base": it.get("b") or "", "lvl": m.get("lvl") or 0,
+                     "imp": m["imp"], "exp": m["exp"], "fl": m.get("fl") or ""}
+            e["pdb"] = it.get("un") or n
+        else:
+            rp, pd = META_INFO.get(n) or {}, pdb.get(n) or {}
+            cls = rp.get("item_class") or ""
+            e["cls"] = CLASS_LABEL.get(cls, cls)
+            if cls == "DivinationCard":
+                e["k"] = "card"
+                e["rew"] = repoe_text(rp.get("description"))
+                if rp.get("stack_size"):
+                    e["set"] = rp["stack_size"]
+                e["fl"] = pd.get("f") or ""
+            else:
+                e["k"] = "x"
+                eff = pd.get("m") if pd.get("ok") and pd.get("m") else repoe_text(rp.get("description"))
+                if eff:
+                    e["eff"] = eff
+                props = [p for p in (pd.get("p") or []) if not re.match(r"(Stack Size|Limit|Quality|Stackable Currency|Map Fragments?|Divination Cards?)\b", p)]
+                if props:
+                    e["props"] = props
+                use = repoe_text(rp.get("directions")) or [re.sub(r"\s*Shift click to unstack\.?", "", u).strip() for u in (pd.get("u") or [])]
+                use = [u for u in use if u]
+                if use:
+                    e["use"] = use
+                if rp.get("stack_size"):
+                    e["stack"] = rp["stack_size"]
+            if pd.get("ok"):
+                e["pdb"] = n
+        out[n] = e
+    print(f"info: {len(out)} items, {sum(1 for v in out.values() if v.get('eff') or v.get('exp') or v.get('rew'))} with text, "
+          f"{sum(1 for v in out.values() if 'pdb' in v)} with a poedb page")
+    return out
+
+
 if __name__ == "__main__":
     out_dir = sys.argv[1] if len(sys.argv) > 1 else "site/data"
     os.makedirs(out_dir, exist_ok=True)
@@ -600,6 +675,10 @@ if __name__ == "__main__":
         json.dump(league, fh, separators=(",", ":"))
     with open(f"{out_dir}/market.json", "w") as fh:
         json.dump(market, fh, separators=(",", ":"))
+    if not META_INFO:
+        load_meta_names()
+    with open(f"{out_dir}/info.json", "w") as fh:
+        json.dump(build_info(recs, market), fh, ensure_ascii=False, separators=(",", ":"))
     with open(f"{out_dir}/hourly.json", "w") as fh:
         json.dump({"generatedAt": market["generatedAt"], "fxv": FX_VERSION, "nj": nj, "fx": fx}, fh, separators=(",", ":"))
     c = Counter((it["g"], it["sig"]) for it in market["items"])
