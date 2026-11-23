@@ -16,7 +16,7 @@ html,body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);
 a{color:var(--accent)}a:hover{color:var(--accent2)}
 button,input,select{font:inherit;color:inherit}
 .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
-.up{color:var(--up)}.dn{color:var(--dn)}.mut{color:var(--muted)}.dim{color:var(--dim)}
+.up{color:var(--up)}.dn{color:var(--dn)}.acc{color:var(--accent)}.mut{color:var(--muted)}.dim{color:var(--dim)}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 
 /* top bar */
@@ -122,6 +122,36 @@ footer{padding:0 22px 40px;color:var(--muted);font-size:12px;line-height:1.6;max
 footer details{margin-top:6px}
 .empty{padding:30px;text-align:center;color:var(--muted)}
 .skel{color:var(--dim)}
+[hidden]{display:none!important}
+/* tabs + tracker */
+.tabs{display:flex;gap:4px}
+.tabs a{padding:6px 12px;border-radius:6px;color:var(--fg2);text-decoration:none;font-weight:600;font-size:13px;border:1px solid transparent;display:inline-flex;align-items:center;gap:6px}
+.tabs a:hover{color:var(--fg)}
+.tabs a[aria-current=page]{background:var(--panel2);border-color:var(--line2);color:var(--accent)}
+.badge{background:var(--dn);color:#fff;border-radius:999px;font-size:10px;font-weight:700;padding:1px 6px;line-height:1.4}
+.star{background:none;border:0;color:var(--dim);cursor:pointer;padding:0 6px 0 0;font-size:14px;line-height:1;vertical-align:-1px}
+.star:hover{color:var(--accent2)}.star[aria-pressed=true]{color:var(--accent)}
+.trk{padding:18px 22px 40px;display:flex;flex-direction:column;gap:16px}
+.trk-head{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.trk-head h2{margin:0;font-size:18px}
+.trk-head .acts{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.addbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.addbar .inp{width:auto}
+#trkQ{flex:1 1 260px;min-width:200px}#trkQty{flex:0 0 140px}
+.quick{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px}
+.tin{background:var(--panel2);border:1px solid var(--line2);color:var(--fg);border-radius:5px;padding:4px 6px;font-family:var(--mono);font-size:12px;text-align:right}
+.tin.q{width:92px}.tin.a{width:76px}
+.tin:focus,.inp:focus{outline:1px solid var(--accent);border-color:var(--accent)}
+tr.hit{background:rgba(232,176,74,.09)}
+tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+.hitlab{font-size:11px;font-weight:600;color:var(--accent);display:block;text-align:right;margin-top:2px}
+.rm{background:none;border:0;color:var(--dim);cursor:pointer;font-size:14px;padding:2px 6px}.rm:hover{color:var(--dn)}
+.alloc{display:flex;flex-direction:column;gap:8px}
+.alloc .r{display:grid;grid-template-columns:minmax(90px,170px) 1fr 64px;gap:10px;align-items:center;font-size:12px}
+.alloc .r span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--fg2)}
+.alloc .bar2{height:10px;background:#1d2128;border-radius:3px;overflow:hidden}.alloc .bar2 i{display:block;height:100%;background:var(--accent);border-radius:3px}
+.alloc .r span:last-child{text-align:right;font-family:var(--mono);color:var(--muted)}
+.note{font-size:12px;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -130,6 +160,10 @@ footer details{margin-top:6px}
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#e8b04a" stroke-width="2" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>
     <span>EXILE MARKET</span><span class="chip" id="leagueChip">PoE 1</span>
   </div>
+  <nav class="tabs" aria-label="Views">
+    <a href="#market" data-view="market">Market</a>
+    <a href="#tracker" data-view="tracker">Tracker <span class="badge" id="trkBadge" hidden></span></a>
+  </nav>
   <div class="ticker" id="ticker"><span class="skel">Loading prices…</span></div>
   <div class="topR">
     <span id="stamp">—</span>
@@ -138,7 +172,7 @@ footer details{margin-top:6px}
   <span id="refreshMsg" class="mut" role="status" style="font-size:12px"></span>
 </header>
 
-<div class="wrap">
+<div class="wrap" id="viewMarket">
   <aside aria-label="Filters">
     <details id="fbox" open><summary class="fsum">Filters</summary><div class="fin">
     <div><label class="lab" for="q">Search</label><input id="q" class="inp" type="search" placeholder="Item name…" autocomplete="off"></div>
@@ -226,6 +260,50 @@ footer details{margin-top:6px}
     <div class="more"><button class="btn2" type="button" id="moreBtn" hidden>Show more</button></div>
 
   </main>
+</div>
+
+<div class="trk" id="viewTracker" hidden>
+  <div class="trk-head">
+    <div><h2>My tracker</h2><div class="note">Follow the currencies and items you care about. Add how many you hold to see what they're worth. Saved in this browser only.</div></div>
+    <div class="acts">
+      <button class="btn2" type="button" id="trkExport">Export</button>
+      <label class="btn2" style="cursor:pointer">Import<input type="file" id="trkImport" accept="application/json,.json" class="sr"></label>
+      <button class="btn2" type="button" id="trkClear">Clear all</button>
+    </div>
+  </div>
+  <div class="addbar">
+    <input id="trkQ" class="inp" list="trkList" placeholder="Add a currency or item, e.g. Divine Orb" autocomplete="off" aria-label="Currency or item to track">
+    <input id="trkQty" class="inp" inputmode="decimal" placeholder="How many (optional)" aria-label="Quantity held">
+    <button class="btn" type="button" id="trkAdd">+ Track</button>
+    <datalist id="trkList"></datalist>
+    <span id="trkMsg" class="note" role="status"></span>
+  </div>
+  <div class="quick" id="trkQuick"></div>
+  <section class="kpis" id="trkKpis" aria-label="Tracker totals"></section>
+  <div class="grid2" id="trkPanels">
+    <section class="panel">
+      <h3>Worth of your holdings · last 7 days and next 7</h3>
+      <p class="cap">Today's quantities valued at each day's prices, in Divines. Dashed lines: the three 7-day predictions.</p>
+      <div class="legend"><span><i class="sw"></i>Actual</span><span><i class="sw d"></i>Current trend</span><span><i class="sw d" style="border-color:#7aa2f7"></i>Like past leagues</span><span><i class="sw d" style="border-color:#3ecf8e"></i>Call</span></div>
+      <div class="chart" id="trkChart" style="min-height:200px"></div>
+    </section>
+    <section class="panel">
+      <h3>Where your value sits</h3>
+      <p class="cap">Share of total worth by holding</p>
+      <div class="alloc" id="trkAlloc"></div>
+    </section>
+  </div>
+  <div class="tblwrap">
+    <table>
+      <thead><tr id="trkHead">
+        <th data-t="n">Item</th><th data-t="q" style="text-align:right">Held</th><th data-t="p">Price</th><th data-t="c1">1h</th>
+        <th style="cursor:default;text-align:center">Last 24h</th><th data-t="c24">24h</th>
+        <th data-t="ft">7d trend</th><th data-t="fh">7d past leagues</th><th data-t="sig">Call</th><th data-t="val">Value</th>
+        <th style="cursor:default" title="Highlight the row when the price goes above or below these. Type chaos (150) or Divines (2d).">Alert above / below</th><th style="cursor:default"><span class="sr">Remove</span></th>
+      </tr></thead>
+      <tbody id="trkBody"></tbody>
+    </table>
+  </div>
 </div>
 
 <footer>
@@ -352,7 +430,7 @@ footer details{margin-top:6px}
 
   // ---------------------------------------------------------------- render
   let ROWS = [];
-  function render() { if (!M) return; ROWS = sorted(filtered()); renderTicker(); renderKpis(); renderTable(); renderHeat(); renderMethod(); }
+  function render() { if (!M) return; ROWS = sorted(filtered()); renderTicker(); renderKpis(); renderTable(); renderHeat(); renderMethod(); M._map = null; updateBadge(); if (view() === 'tracker') renderTracker(); }
   function renderTicker() {
     const byN = new Map(M.items.map((i) => [i.n, i]));
     const d = M.divine; const cur = (d.h || []).filter((x) => x != null).slice(-1)[0];
@@ -400,7 +478,7 @@ footer details{margin-top:6px}
       const liq = i.v != null ? short(i.v) + 'c/day' : i.ls != null ? i.ls + ' listed' : '—';
       const sc = i.sig === 'Gain' ? 'up' : i.sig === 'Lose' ? 'dn' : 'mut';
       const tr = el('tr', { tabindex: '0', title: 'Open details' },
-        el('td', { class: 'nm' }, i.n, sub ? el('small', { text: sub }) : null),
+        el('td', { class: 'nm' }, starBtn(i.n), i.n, sub ? el('small', { text: sub }) : null),
         el('td', { class: 'mut', text: i.c }),
         el('td', { class: 'mono', title: altP(i.p), text: fmtP(i.p) }),
         el('td', { class: 'mono ' + cls(i.c1), text: pct(i.c1) }),
@@ -411,8 +489,8 @@ footer details{margin-top:6px}
         el('td', {}, el('span', { class: 'sig ' + sc, text: i.sig })),
         el('td', { class: 'mut', text: liq }),
         el('td', { style: 'text-align:center' }, tradeLink(i) || el('span', { class: 'dim', text: '—', title: 'Bulk items trade on Faustus' })));
-      tr.addEventListener('click', () => openDrawer(i));
-      tr.addEventListener('keydown', (e) => { if (e.key === 'Enter') openDrawer(i); });
+      tr.addEventListener('click', (e) => { if (!e.target.closest('button,a,input')) openDrawer(i); });
+      tr.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target === tr) openDrawer(i); });
       return tr;
     }));
     $('#moreBtn').hidden = rows.length <= shown;
@@ -587,7 +665,7 @@ footer details{margin-top:6px}
       closeBtn,
       el('div', {}, el('div', { class: 'mut', style: 'font-size:12px', text: [i.c, i.s, i.l ? i.l + '-link' : null].filter(Boolean).join(' · ') }), el('h2', { text: i.n }),
         el('div', { class: 'mono', style: 'font-size:28px;margin-top:4px' }, fmtP(i.p) + ' ', el('span', { class: 'mut', style: 'font-size:14px', text: altP(i.p) })),
-        i.g === 'Uniques' ? el('div', { style: 'margin-top:10px' }, tradeLink(i, 'Search on official trade ↗')) : null),
+        el('div', { style: 'margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center' }, drawerTrackBtn(i), i.g === 'Uniques' ? tradeLink(i, 'Search on official trade ↗') : null)),
       el('div', { class: 'stats' }, stat('1h', pct(i.c1), cls(i.c1)), stat('6h', pct(i.c6), cls(i.c6)), stat('24h', pct(v24(i)), cls(v24(i))),
         stat('Since first traded', pct(i.chg), cls(i.chg)),
         stat('7 days · current trend', pct(i.ft), cls(i.ft)),
@@ -609,6 +687,187 @@ footer details{margin-top:6px}
   }
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#drawerHost').children.length) closeDrawer(); });
 
+  // ---------------------------------------------------------------- tracker
+  const T = { items: [], sortK: 'val', sortDir: -1 };
+  const cleanT = (arr) => (Array.isArray(arr) ? arr : []).filter((x) => x && typeof x.n === 'string' && x.n.length < 200)
+    .map((x) => ({ n: x.n, q: Math.max(0, +x.q || 0), hi: String(x.hi || '').slice(0, 20), lo: String(x.lo || '').slice(0, 20) }))
+    .filter((x, k, a) => a.findIndex((y) => y.n === x.n) === k).slice(0, 300);
+  try { const s0 = JSON.parse(localStorage.getItem('em-tracker') || 'null'); if (s0) T.items = cleanT(s0.items); } catch (e) {}
+  const tsave = () => { try { localStorage.setItem('em-tracker', JSON.stringify({ v: 1, items: T.items })); } catch (e) {} };
+  const isTracked = (n) => T.items.some((x) => x.n === n);
+  const track = (n, q = 0) => { if (!isTracked(n)) { T.items.push({ n, q, hi: '', lo: '' }); tsave(); } };
+  const untrack = (n) => { T.items = T.items.filter((x) => x.n !== n); tsave(); };
+  const QUICK = ['Divine Orb', 'Chaos Orb', 'Mirror of Kalandra', 'Mirror Shard', 'Exalted Orb', "Hinekora's Lock", 'Orb of Annulment', 'Fracturing Orb', 'Orb of Alchemy', 'Vaal Orb'];
+  const view = () => location.hash === '#tracker' ? 'tracker' : 'market';
+
+  const pctTo = (a, b) => a && b ? (b / a - 1) * 100 : null;
+  const callOf = (f7) => f7 == null ? 'New' : f7 > 10 ? 'Gain' : f7 < -10 ? 'Lose' : 'Hold';
+  const lastNN = (arr, back = 0) => { const v = (arr || []).filter((x) => x != null); return v[v.length - 1 - back]; };
+  // Chaos and Divine are the units prices are quoted in, so they are not rows in market.json: build them here
+  function synthetic(n) {
+    const d = M.divine, r = divRate();
+    if (n === 'Chaos Orb') return { n, g: 'Exchange', c: 'Currency', p: 1, h: M.days.map(() => 1), f: M.fdays.map(() => 1), sp: null, sig: 'Hold', conf: 'High', tr: 'Base unit', unit: true };
+    if (n === 'Divine Orb' && r) { const f7 = pctTo(r, (d.f || [])[6]);
+      return { n, g: 'Exchange', c: 'Currency', p: r, h: d.h, f: d.f, tp: d.ft || d.f, hpth: d.fh, sp: d.sp, c1: d.c1, c6: d.c6, c24: d.c24, d1: pctTo(lastNN(d.h, 1), r),
+        ft: pctTo(r, (d.ft || d.f || [])[6]), fh: d.fh ? pctTo(r, d.fh[6]) : null, fhs: 'item', f7, sig: callOf(f7), conf: 'High', tr: 'In chaos', src: d.src }; }
+    return null;
+  }
+  const itemMap = () => M._map || (M._map = new Map(M.items.map((i) => [i.n, i])));
+  const getItem = (n) => itemMap().get(n) || synthetic(n);
+  const allNames = () => ['Divine Orb', 'Chaos Orb', ...M.items.map((i) => i.n)];
+
+  // alert levels: "150" or "150c" = chaos, "2d" / "2 div" = Divines
+  function parseP(s) { const m = String(s || '').trim().toLowerCase().match(/^([\d.,]+)\s*(d|div|divs|divine|divines|c|chaos)?$/); if (!m) return null;
+    const v = parseFloat(m[1].replace(/,/g, '')); if (isNaN(v)) return null; return m[2] && m[2][0] === 'd' ? v * (divRate() || NaN) : v; }
+  const alertHit = (x, i) => { if (!i) return null; const hi = parseP(x.hi), lo = parseP(x.lo); if (hi != null && i.p >= hi) return 'up'; if (lo != null && i.p <= lo) return 'down'; return null; };
+  function updateBadge() { const b = $('#trkBadge'); if (!b || !M) return; const n = T.items.filter((x) => alertHit(x, getItem(x.n))).length; b.hidden = !n; b.textContent = n; b.title = n + ' price alert' + (n > 1 ? 's' : '') + ' reached'; }
+
+  function starBtn(n) { const on = isTracked(n);
+    return el('button', { class: 'star', type: 'button', 'aria-pressed': on, title: on ? 'Tracking: click to stop' : 'Add to my tracker', 'aria-label': (on ? 'Stop tracking ' : 'Track ') + n, text: on ? '★' : '☆',
+      onclick: (e) => { e.stopPropagation(); isTracked(n) ? untrack(n) : track(n); const b = e.currentTarget, o = isTracked(n); b.setAttribute('aria-pressed', o); b.textContent = o ? '★' : '☆'; b.title = o ? 'Tracking: click to stop' : 'Add to my tracker'; updateBadge(); } }); }
+  function drawerTrackBtn(i) { const b = el('button', { class: 'btn2', type: 'button' }); const set = () => { b.textContent = isTracked(i.n) ? '★ Tracking' : '☆ Add to tracker'; };
+    b.addEventListener('click', () => { isTracked(i.n) ? untrack(i.n) : track(i.n); set(); renderTable(); updateBadge(); if (view() === 'tracker') renderTracker(); }); set(); return b; }
+
+  function tRows() { return T.items.map((x) => ({ x, i: getItem(x.n) })); }
+  const tval = (r, k) => { const { x, i } = r; if (k === 'q') return x.q; if (k === 'n') return x.n; if (!i) return null; if (k === 'val') return x.q * i.p; return val(i, k); };
+  const fmtWorthD = (d) => d == null || isNaN(d) ? '—' : (d >= 1000 ? d3.format(',.0f')(d) : d >= 10 ? d3.format(',.1f')(d) : d3.format(',.2f')(d)) + ' div';
+
+  function renderTracker() {
+    if (!M) return;
+    const names = allNames(); const dl = $('#trkList');
+    if (dl.childElementCount !== names.length) dl.replaceChildren(...names.map((n) => el('option', { value: n })));
+    $('#trkQuick').replaceChildren(el('span', { class: 'dim', text: 'Quick add:' }), ...QUICK.filter((n) => getItem(n) && !isTracked(n)).map((n) => el('button', { class: 'pill', type: 'button', text: '+ ' + n, onclick: () => { track(n); renderTracker(); renderTable(); } })));
+    const rows = tRows(), live = rows.filter((r) => r.i), r = divRate(), d = M.divine;
+    const has = rows.length > 0, held = live.filter((r2) => r2.x.q > 0);
+    $('#trkPanels').hidden = !held.length; $('#trkKpis').hidden = !has;
+    // ---- totals
+    const now = d3.sum(held, ({ x, i }) => x.q * i.p);
+    const dc24 = d.c24 ?? pctTo(lastNN(d.h, 1), r), rPast = r && dc24 != null ? r / (1 + dc24 / 100) : null;
+    const past = d3.sum(held, ({ x, i }) => { const c = v24(i); return x.q * (c == null ? i.p : i.p / (1 + c / 100)); });
+    const nowD = r ? now / r : null, pastD = rPast ? past / rPast : null;
+    const fut = (key, rate) => { const rr = (rate || [])[6]; if (!rr) return null; return d3.sum(held, ({ x, i }) => x.q * ((i[key] || i.f || [])[6] ?? i.p)) / rr; };
+    const fCall = fut('f', d.f), fTr = fut('tp', d.ft || d.f), fPast = fut('hpth', d.fh || d.f);
+    const lose = held.filter(({ i }) => i.sig === 'Lose').sort((a, b) => b.x.q * b.i.p - a.x.q * a.i.p), hits = rows.filter(({ x, i }) => alertHit(x, i));
+    const k = (label, value, sub, c) => el('div', { class: 'kpi' }, el('div', { class: 'k', text: label }), el('div', { class: 'v ' + (c || ''), text: value }), el('div', { class: 's', text: sub }));
+    const ch24 = pctTo(pastD, nowD), chF = pctTo(nowD, fCall);
+    $('#trkKpis').replaceChildren(
+      k('Net worth', held.length ? fmtWorthD(nowD) : '—', held.length ? `≈ ${d3.format(',.0f')(now)}c · ${held.length} holding${held.length > 1 ? 's' : ''}` : 'Enter how many you hold to see your worth'),
+      k('Last 24h', held.length ? pct(ch24) : '—', held.length && nowD != null && pastD != null ? `${nowD >= pastD ? '+' : '−'}${fmtWorthD(Math.abs(nowD - pastD))} in Divine terms` : 'Change in what your holdings are worth', held.length ? cls(ch24) : ''),
+      k('In 7 days · Call', held.length ? fmtWorthD(fCall) : '—', held.length ? `${pct(chF)} · trend ${fmtWorthD(fTr)} · past leagues ${fmtWorthD(fPast)}` : 'Projected worth from the forecasts', held.length ? cls(chF) : ''),
+      k('Watch', `${hits.length} alert${hits.length === 1 ? '' : 's'}`, lose.length ? `Call says Lose: ${lose.slice(0, 2).map((z) => z.x.n).join(', ')}${lose.length > 2 ? ` +${lose.length - 2}` : ''}` : 'No holdings with a Lose call', hits.length ? 'acc' : ''));
+    // ---- allocation
+    const top = held.map(({ x, i }) => ({ n: x.n, v: x.q * i.p })).sort((a, b) => b.v - a.v); const shown2 = top.slice(0, 7), rest = d3.sum(top.slice(7), (z) => z.v);
+    if (rest > 0) shown2.push({ n: `Other (${top.length - 7})`, v: rest });
+    $('#trkAlloc').replaceChildren(...shown2.map((z) => { const s2 = now ? z.v / now * 100 : 0; return el('div', { class: 'r', title: `${z.n}: ${fmtP(z.v)}` }, el('span', { text: z.n }), el('div', { class: 'bar2' }, el('i', { style: `width:${Math.max(1, s2)}%` })), el('span', { text: d3.format('.1f')(s2) + '%' })); }));
+    // ---- table
+    $$('#trkHead th[data-t]').forEach((th) => th.setAttribute('aria-sort', T.sortK === th.dataset.t ? (T.sortDir < 0 ? 'descending' : 'ascending') : 'none'));
+    const sk = T.sortK, sd = T.sortDir;
+    const srt = rows.slice().sort((a, b) => { const x = tval(a, sk), y = tval(b, sk); if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1; return (typeof x === 'string' ? x.localeCompare(y) : x - y) * sd; });
+    const tb = $('#trkBody');
+    if (!rows.length) { tb.replaceChildren(el('tr', {}, el('td', { colspan: 12, class: 'empty', text: 'Nothing tracked yet. Add a currency above, use Quick add, or press ☆ next to any item on the Market tab.' }))); return; }
+    tb.replaceChildren(...srt.map(({ x, i }) => {
+      const rm = el('button', { class: 'rm', type: 'button', title: 'Stop tracking', 'aria-label': 'Stop tracking ' + x.n, text: '✕', onclick: () => { untrack(x.n); renderTracker(); renderTable(); updateBadge(); } });
+      if (!i) return el('tr', {}, el('td', { class: 'nm' }, x.n, el('small', { text: 'Not priced this hour (too few trades)' })), el('td', { colspan: 10 }), el('td', {}, rm));
+      const qIn = el('input', { class: 'tin q', inputmode: 'decimal', value: x.q || '', placeholder: '0', 'aria-label': 'How many ' + x.n });
+      qIn.addEventListener('change', () => { x.q = Math.max(0, parseFloat(qIn.value.replace(/,/g, '')) || 0); tsave(); renderTracker(); });
+      const aIn = (key, ph) => { const inp = el('input', { class: 'tin a', value: x[key], placeholder: ph, 'aria-label': (key === 'hi' ? 'Alert above, ' : 'Alert below, ') + x.n });
+        inp.addEventListener('change', () => { x[key] = inp.value.trim(); tsave(); renderTracker(); updateBadge(); }); return inp; };
+      const hit = alertHit(x, i), sc = i.sig === 'Gain' ? 'up' : i.sig === 'Lose' ? 'dn' : 'mut';
+      const tr = el('tr', { class: hit ? 'hit' : '', tabindex: '0', title: 'Open details' },
+        el('td', { class: 'nm' }, x.n, el('small', { text: i.unit ? 'Prices are quoted in chaos' : x.n === 'Divine Orb' ? 'Moves shown in chaos' : i.c })),
+        el('td', {}, qIn),
+        el('td', { class: 'mono', title: altP(i.p), text: x.n === 'Divine Orb' ? fmtC(i.p) + 'c' : fmtP(i.p) }),
+        el('td', { class: 'mono ' + cls(i.c1), text: pct(i.c1) }),
+        el('td', { style: 'text-align:center;padding:4px 12px' }, spark(i.sp)),
+        el('td', { class: 'mono ' + cls(v24(i)), text: pct(v24(i)) }),
+        el('td', { class: 'mono ' + cls(i.ft), style: 'font-weight:600', text: pct(i.ft) }),
+        el('td', { class: 'mono ' + cls(i.fh) }, pct(i.fh), i.fhs === 'category' ? el('sup', { class: 'dim', text: ' c' }) : null),
+        el('td', {}, i.unit ? el('span', { class: 'dim', text: '—' }) : el('span', { class: 'sig ' + sc, text: i.sig })),
+        el('td', { class: 'mono', title: x.q ? altP(x.q * i.p) : '' , text: x.q ? fmtP(x.q * i.p) : '—' }),
+        el('td', {}, el('div', { style: 'display:flex;gap:4px;justify-content:flex-end' }, aIn('hi', '≥ price'), aIn('lo', '≤ price')),
+          hit ? el('span', { class: 'hitlab', text: hit === 'up' ? '▲ Above your alert' : '▼ Below your alert' }) : null),
+        el('td', {}, rm));
+      tr.addEventListener('click', (e) => { if (!e.target.closest('button,a,input')) openDrawer(i); });
+      tr.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target === tr) openDrawer(i); });
+      return tr;
+    }));
+    requestAnimationFrame(() => worthChart($('#trkChart'), held));
+  }
+
+  // today's holdings valued over the last 7 days, plus the three 7-day paths, all in Divines
+  function worthChart(host, held) {
+    host.replaceChildren(); if (!held.length) return;
+    const d = M.divine, P = d3.utcParse('%Y-%m-%d');
+    const fill = (arr, fb) => (arr || []).map((v, k, a) => v ?? a.slice(k).find((y) => y != null) ?? fb);
+    const dh = fill(d.h, divRate());
+    const act = M.days.map((ds, k) => { const c = d3.sum(held, ({ x, i }) => x.q * (fill(i.h, i.p)[k] ?? i.p)); return { t: P(ds), c, v: dh[k] ? c / dh[k] : null }; }).filter((p) => p.v != null);
+    if (act.length < 2) { host.append(el('div', { class: 'empty', text: 'Not enough daily history yet.' })); return; }
+    const path = (key, rate) => { if (!rate) return null; return [act[act.length - 1], ...M.fdays.map((ds, j) => { const c = d3.sum(held, ({ x, i }) => x.q * ((i[key] || i.f || [])[j] ?? i.p)); return { t: P(ds), c, v: rate[j] ? c / rate[j] : null }; }).filter((p) => p.v != null)]; };
+    const lines = [{ pts: act, col: ACC, dash: null, w: 2.2, lab: 'Actual' }, { pts: path('tp', d.ft || d.f), col: ACC, dash: '5 4', w: 1.8, lab: 'Trend' },
+      { pts: path('hpth', d.fh), col: '#7aa2f7', dash: '5 4', w: 1.8, lab: 'Past leagues' }, { pts: path('f', d.f), col: UP, dash: '2 3', w: 1.8, lab: 'Call' }].filter((l) => l.pts && l.pts.length > 1);
+    const all = lines.flatMap((l) => l.pts);
+    const W = Math.max(280, host.clientWidth), Hh = 200, m = { t: 8, r: 10, b: 24, l: 10 };
+    const svg = d3.select(host).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${Hh}`).attr('role', 'img').attr('aria-label', 'Worth of your holdings in Divines, last 7 days and 7-day predictions');
+    const ext = d3.extent(all, (p) => p.v), pad = (ext[1] - ext[0]) * 0.08 || ext[1] * 0.05 || 1;
+    const y = d3.scaleLinear().domain([Math.max(0, ext[0] - pad), ext[1] + pad]).nice(4);
+    const fy = (v) => fmtD(v);
+    const probe = svg.append('text').attr('class', 'tick').append('tspan').text(fy(y.domain()[1])); m.l = Math.ceil(probe.node().getComputedTextLength()) + 12; probe.node().parentNode.remove();
+    const x = d3.scaleUtc().domain(d3.extent(all, (p) => p.t)).range([m.l, W - m.r]); y.range([Hh - m.b, m.t]);
+    svg.append('g').attr('class', 'grid').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickSize(-(W - m.l - m.r)).tickFormat(''));
+    svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickFormat(fy)).call((g) => g.select('.domain').remove());
+    svg.append('g').attr('transform', `translate(0,${Hh - m.b})`).call(d3.axisBottom(x).ticks(W < 450 ? 4 : 8).tickFormat(d3.utcFormat('%-d %b')));
+    const today = act[act.length - 1].t; svg.append('line').attr('x1', x(today)).attr('x2', x(today)).attr('y1', m.t).attr('y2', Hh - m.b).attr('stroke', '#5d6573').attr('stroke-dasharray', '3 3');
+    const line = d3.line().x((p) => x(p.t)).y((p) => y(p.v));
+    lines.slice().reverse().forEach((l) => svg.append('path').datum(l.pts).attr('fill', 'none').attr('stroke', l.col).attr('stroke-width', l.w).attr('stroke-dasharray', l.dash).attr('d', line));
+    svg.append('g').selectAll('circle').data(act).join('circle').attr('cx', (p) => x(p.t)).attr('cy', (p) => y(p.v)).attr('r', 3).attr('fill', ACC);
+    const tip = d3.select(host).append('div').attr('class', 'tip').style('display', 'none');
+    const days = [...new Set(all.map((p) => +p.t))].sort((a, b) => a - b);
+    svg.append('rect').attr('x', m.l).attr('width', W - m.l - m.r).attr('height', Hh).attr('fill', 'transparent')
+      .on('pointermove', (ev) => { const [mx] = d3.pointer(ev); const t = days.reduce((a, b) => Math.abs(x(b) - mx) < Math.abs(x(a) - mx) ? b : a);
+        tip.style('display', null).selectAll('*').remove(); tip.append('div').attr('class', 'mut').text(d3.utcFormat('%-d %b')(new Date(t)) + (t > +today ? ' · forecast' : t === +today ? ' · today' : ''));
+        lines.forEach((l) => { const p = l.pts.find((q) => +q.t === t); if (p && !(l.lab !== 'Actual' && t === +today)) tip.append('div').style('color', l.col).text(`${l.lab}: ${fmtWorthD(p.v)} (${d3.format(',.0f')(p.c)}c)`); });
+        const tw = tip.node().offsetWidth, sx = x(t) / W * host.clientWidth; tip.style('left', Math.max(0, Math.min(host.clientWidth - tw, sx + 12)) + 'px').style('top', '0px'); })
+      .on('pointerleave', () => tip.style('display', 'none'));
+  }
+
+  function addFromBar() {
+    const q = $('#trkQ').value.trim(), msg = $('#trkMsg'); if (!q || !M) return;
+    const n = allNames().find((x) => x.toLowerCase() === q.toLowerCase());
+    if (!n) { msg.textContent = `"${q}" isn't priced right now. Pick a name from the list.`; return; }
+    const qty = Math.max(0, parseFloat($('#trkQty').value.replace(/,/g, '')) || 0);
+    if (isTracked(n)) { if (qty) T.items.find((x) => x.n === n).q = qty; tsave(); msg.textContent = qty ? `Updated ${n}.` : `${n} is already tracked.`; }
+    else { track(n, qty); msg.textContent = `Tracking ${n}.`; }
+    $('#trkQ').value = ''; $('#trkQty').value = ''; $('#trkQ').focus(); renderTracker(); renderTable(); updateBadge();
+    setTimeout(() => { msg.textContent = ''; }, 5000);
+  }
+  $('#trkAdd').addEventListener('click', addFromBar);
+  ['#trkQ', '#trkQty'].forEach((s2) => $(s2).addEventListener('keydown', (e) => { if (e.key === 'Enter') addFromBar(); }));
+  on('#trkHead th[data-t]', 'click', (e) => { const k2 = e.currentTarget.dataset.t; if (T.sortK === k2) T.sortDir = -T.sortDir; else { T.sortK = k2; T.sortDir = ['n', 'sig'].includes(k2) ? 1 : -1; } renderTracker(); });
+  $('#trkExport').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify({ v: 1, exported: new Date().toISOString(), items: T.items }, null, 2)], { type: 'application/json' });
+    const a = el('a', { href: URL.createObjectURL(blob), download: 'exile-market-tracker.json' }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  });
+  $('#trkImport').addEventListener('change', async (e) => {
+    const f = e.target.files[0], msg = $('#trkMsg'); e.target.value = ''; if (!f) return;
+    try { const j = JSON.parse(await f.text()); const items = cleanT(j.items); if (!items.length) throw new Error('empty');
+      T.items = items; tsave(); msg.textContent = `Imported ${items.length} item${items.length > 1 ? 's' : ''}.`; renderTracker(); renderTable(); updateBadge();
+    } catch (err) { msg.textContent = "That file isn't a tracker export."; }
+    setTimeout(() => { msg.textContent = ''; }, 6000);
+  });
+  let clearArm = null;
+  $('#trkClear').addEventListener('click', (e) => { const b = e.currentTarget;
+    if (!clearArm) { b.textContent = 'Click again to clear'; clearArm = setTimeout(() => { clearArm = null; b.textContent = 'Clear all'; }, 4000); return; }
+    clearTimeout(clearArm); clearArm = null; b.textContent = 'Clear all'; T.items = []; tsave(); renderTracker(); renderTable(); updateBadge(); });
+
+  function setView() {
+    const v = view(); $('#viewMarket').hidden = v !== 'market'; $('#viewTracker').hidden = v !== 'tracker';
+    $$('.tabs a').forEach((a) => { if (a.dataset.view === v) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+    document.title = (v === 'tracker' ? 'My tracker · ' : '') + 'Exile Market · PoE price terminal';
+    if (M) { if (v === 'tracker') renderTracker(); else { renderTable(); drawDivine(); } }
+  }
+  window.addEventListener('hashchange', setView);
+  setView();
+
   // ---------------------------------------------------------------- refresh
   $('#refresh').addEventListener('click', async (e) => {
     const b = e.currentTarget, msg = $('#refreshMsg'); b.disabled = true; b.textContent = '↻ Refreshing…'; msg.textContent = '';
@@ -618,7 +877,7 @@ footer details{margin-top:6px}
     } catch (err) { msg.textContent = 'Could not load data. Try again shortly.'; }
     b.disabled = false; b.textContent = '↻ Refresh'; setTimeout(() => { msg.textContent = ''; }, 9000);
   });
-  let rw = window.innerWidth; window.addEventListener('resize', () => { if (Math.abs(window.innerWidth - rw) > 40) { rw = window.innerWidth; drawDivine(); } });
+  let rw = window.innerWidth; window.addEventListener('resize', () => { if (Math.abs(window.innerWidth - rw) > 40) { rw = window.innerWidth; drawDivine(); if (view() === 'tracker') renderTracker(); } });
 
   if (window.matchMedia('(max-width: 900px)').matches) $('#fbox').removeAttribute('open');
   load(true).catch(() => { $('#tbody').replaceChildren(el('tr', {}, el('td', { colspan: 11, class: 'empty', text: 'Could not load market data.' }))); });
