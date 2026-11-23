@@ -109,6 +109,13 @@ td.nm small{display:block;color:var(--dim);font-weight:400;font-size:11px}
 .stat{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px}
 .stat .k{font-size:11px;color:var(--muted)}.stat .v{font-family:var(--mono);font-size:16px;margin-top:3px}.stat .v.t{font-family:var(--sans);font-size:14px;font-weight:600}
 .x{position:absolute;top:14px;right:14px}
+.zoomable{cursor:zoom-in}
+.zoomable::after{content:'⤢';position:absolute;top:-2px;right:0;font-size:13px;color:var(--dim);pointer-events:none}
+.zoomable:hover::after{color:var(--accent)}
+.zoom{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;padding:20px}
+.zoom .box{background:var(--bg2);border:1px solid var(--line2);border-radius:10px;width:min(1500px,100%);max-height:100%;overflow:auto;padding:16px 20px 18px;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.zoom h3{margin:0 40px 4px 0;font-size:16px}.zoom .cap{font-size:12px;color:var(--muted);margin:0 0 8px}
+.zoom .chart{cursor:default}.zoom .chart .tick text{font-size:12px}
 .cmp-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0 8px}
 .cmp-legend{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
 .cmp-legend button{font-size:12px;background:var(--panel2);border:1px solid var(--line2);border-radius:999px;padding:3px 10px;cursor:pointer;color:var(--fg2);display:inline-flex;align-items:center;gap:6px}
@@ -361,7 +368,7 @@ td.nm .ico{margin-top:-2px}
   const fmtD = (d) => d >= 100 ? d3.format(',.0f')(d) : d >= 10 ? d3.format('.1f')(d) : d3.format('.2f')(d);
   let U = 'div'; try { if (localStorage.getItem('em-unit') === 'c') U = 'c'; } catch (e) {}
   const isDiv = (p) => { const r = divRate(); return U === 'div' && r && p != null && p >= r; };
-  const fmtDv = (v) => v == null || isNaN(v) ? '—' : v >= 100 ? d3.format(',.0f')(v) : d3.format('.3~r')(v);
+  const fmtDv = (v) => v == null || isNaN(v) ? '—' : v >= 100 ? d3.format(',.0f')(v) : d3.format('.4~r')(v);
   // a chart for this item is drawn in Divines when the switch says so and the item is worth 1 Divine or more
   const chartInDiv = (i) => i && i.n !== 'Divine Orb' && !i.unit && isDiv(i.p);
   const fillNN = (arr, fb) => (arr || []).map((v, k, a) => v ?? a.slice(k).find((y) => y != null) ?? [...a.slice(0, k)].reverse().find((y) => y != null) ?? fb);
@@ -551,9 +558,29 @@ td.nm .ico{margin-top:-2px}
     $('#heat').replaceChildren(...groups.map(([c, g]) => el('button', { type: 'button', style: `background:${col(g.med * ks)}`, title: `${c}: median ${pct(g.med)} (${g.n} items)`, onclick: () => { S.cats = [c]; S.market = c.startsWith('Unique') ? 'Uniques' : 'all'; shown = 50; syncControls(); save(); render(); } }, c, el('span', { text: pct(g.med) }))));
   }
 
+  // ---------------------------------------------------------------- click a chart to see it bigger
+  // each chart registers how to redraw itself at a given height; the overlay just calls that
+  function zoomable(host, title, draw, extra) { host._zoom = { title, draw, extra }; host.classList.add('zoomable'); host.title = 'Click to expand'; }
+  let zoomEl = null;
+  function closeZoom() { if (zoomEl) { zoomEl.remove(); zoomEl = null; } }
+  function openZoom(z) {
+    closeZoom();
+    const host = el('div', { class: 'chart' });
+    const box = el('div', { class: 'box', role: 'dialog', 'aria-modal': 'true', 'aria-label': z.title },
+      el('button', { class: 'btn2 x', type: 'button', 'aria-label': 'Close', text: '✕', onclick: closeZoom }),
+      el('h3', { text: z.title }), z.extra ? z.extra() : null, host);
+    zoomEl = el('div', { class: 'zoom', onclick: (e) => { if (e.target === zoomEl) closeZoom(); } }, box);
+    document.body.append(zoomEl);
+    requestAnimationFrame(() => z.draw(host, Math.max(300, Math.round(window.innerHeight * 0.66))));
+  }
+  document.addEventListener('click', (e) => { const c = e.target.closest('.zoomable'); if (c && c._zoom && !c.closest('.zoom')) openZoom(c._zoom); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && zoomEl) { closeZoom(); e.stopImmediatePropagation(); } }, true);
+
   // ---------------------------------------------------------------- charts
-  function hourlyChart(host, { t, s, lo, hi, v }, opts = {}) {
+  function hourlyChart(host, data, opts = {}) {
+    const { t, s, lo, hi, v } = data;
     host.replaceChildren();
+    if (!opts.zoomed) zoomable(host, opts.title || opts.aria || 'Hourly price', (h2, H2) => hourlyChart(h2, data, { ...opts, h: H2, zoomed: true }), opts.extra);
     const rt = opts.div ? hourRates(t) : null, cv = (x, k) => x == null ? null : rt ? (rt[k] ? x / rt[k] : null) : x;
     const fmtY = rt ? fmtDv : fmtC, suf = rt ? ' div' : 'c';
     const pts = t.map((ts, k) => ({ t: new Date(ts), p: cv(s[k], k), lo: lo ? cv(lo[k], k) : null, hi: hi ? cv(hi[k], k) : null, v: v && v[k] != null && s[k] ? v[k] / s[k] : null })).filter((d) => d.p != null);
@@ -593,8 +620,9 @@ td.nm .ico{margin-top:-2px}
     else if (i.sig === 'Hold' && (Math.abs(i.ft) > 10 || Math.abs(i.fh) > 10)) msg = 'Why the call is Hold: the trend and past leagues point different ways, or past moves like this one tended to fade.';
     return msg ? el('p', { class: 'mut', style: 'font-size:12px;margin:0;line-height:1.5', text: msg }) : null;
   }
-  function dailyChart(host, item) {
+  function dailyChart(host, item, Hz) {
     host.replaceChildren();
+    if (!Hz) zoomable(host, item.n + ' · daily price and both 7-day predictions', (h2, H2) => dailyChart(h2, item, H2), () => el('div', { class: 'legend' }, el('span', {}, el('i', { class: 'sw' }), 'Actual'), el('span', {}, el('i', { class: 'sw d' }), 'Current trend'), el('span', {}, el('i', { class: 'sw d', style: 'border-color:#7aa2f7' }), 'Like past leagues')));
     const days = M.days.map((d) => d3.utcParse('%Y-%m-%d')(d)), fdays = M.fdays.map((d) => d3.utcParse('%Y-%m-%d')(d));
     const dv = chartInDiv(item), D = M.divine, dh = fillNN(D.h, divRate());
     const fmtY = dv ? fmtDv : fmtC;
@@ -603,7 +631,7 @@ td.nm .ico{margin-top:-2px}
     if (act.length < 1) return;
     const mk = (arr, rates) => arr ? [act[act.length - 1], ...arr.map((p, k) => ({ t: fdays[k], p: cv(p, (rates || [])[k]) })).filter((d) => d.p != null)] : null;
     const fc = mk(item.tp || item.f, D.ft || D.f), fh = mk(item.hpth, D.fh || D.f);
-    const all = [...act, ...(fc || []), ...(fh || [])]; const W = Math.max(280, host.clientWidth), Hh = 170, m = { t: 8, r: 10, b: 24, l: 10 };
+    const all = [...act, ...(fc || []), ...(fh || [])]; const W = Math.max(280, host.clientWidth), Hh = Hz || 170, m = { t: 8, r: 10, b: 24, l: 10 };
     const svg = d3.select(host).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${Hh}`).attr('role', 'img').attr('aria-label', 'Daily price and 7-day forecast');
     const y = d3.scaleLinear().domain([0, d3.max(all, (d) => d.p) * 1.05]).nice(4);
     const probe = svg.append('text').attr('class', 'tick').append('tspan').text(fmtY(y.domain()[1])); m.l = Math.ceil(probe.node().getComputedTextLength()) + 12; probe.node().parentNode.remove();
@@ -627,27 +655,29 @@ td.nm .ico{margin-top:-2px}
   function drawDivine() {
     const host = $('#divChart'); const sr = seriesFor('Divine Orb');
     if (!sr) { host.replaceChildren(el('div', { class: 'empty', text: H ? 'Hourly history is still building.' : 'Loading…' })); return; }
-    hourlyChart(host, sr, { aria: 'Divine Orb hourly price in chaos, last 48 hours', unitName: 'Divines' });
+    hourlyChart(host, sr, { aria: 'Divine Orb hourly price in chaos, last 48 hours', title: 'Divine Orb · chaos per Divine, last 48 hours', unitName: 'Divines' });
   }
 
 
   // ---------------------------------------------------------------- compare with past leagues
-  const CMP = { idx: undefined, shards: {}, league: undefined, unit: 'c', range: 30, hidden: new Set() };
+  const CMP = { idx: undefined, shards: {}, league: undefined, unit: 'c', range: 30, hidden: new Set(), mode: 'day', hidx: undefined, hshards: {} };
   const LCOL = ['#7aa2f7', '#bb9af7', '#9ece6a', '#7dcfff', '#f7768e', '#c0caf5', '#ff9e64'];
   async function cmpIndex() { if (CMP.idx === undefined) { try { CMP.idx = await fetch('data/curves/index.json').then((r) => r.ok ? r.json() : null); } catch (e) { CMP.idx = null; } } return CMP.idx; }
   async function cmpLeague() { if (CMP.league === undefined) { try { CMP.league = await fetch('data/league.json?t=' + Date.now(), { cache: 'no-store' }).then((r) => r.ok ? r.json() : null); } catch (e) { CMP.league = null; } } return CMP.league; }
   function shardOf(name, n) { let h = 5381; for (const ch of name) h = (Math.imul(h, 33) ^ ch.codePointAt(0)) >>> 0; return h % n; }
   async function cmpShard(i) { if (!(i in CMP.shards)) { try { CMP.shards[i] = await fetch(`data/curves/${i}.json`).then((r) => r.ok ? r.json() : {}); } catch (e) { CMP.shards[i] = {}; } } return CMP.shards[i]; }
-  async function renderCompare(host, item) {
+  const modeSeg = (redraw) => el('div', { class: 'seg', role: 'group', 'aria-label': 'Daily or hourly' }, ...[['day', 'Daily'], ['hour', 'Hourly']].map(([v, l]) => el('button', { type: 'button', 'aria-pressed': CMP.mode === v, onclick: () => { CMP.mode = v; redraw(); } }, l)));
+  function renderCompare(host, item) { return CMP.mode === 'hour' ? renderCompareHourly(host, item) : renderCompareDaily(host, item); }
+  async function renderCompareDaily(host, item) {
     host.replaceChildren(el('div', { class: 'empty', style: 'padding:16px', text: 'Loading past leagues…' }));
     const [idx, cur] = await Promise.all([cmpIndex(), cmpLeague()]);
-    if (!idx) { host.replaceChildren(el('div', { class: 'empty', style: 'padding:16px', text: 'Past-league prices are not available yet.' })); return; }
+    if (!idx) { host.replaceChildren(el('div', { class: 'cmp-bar' }, modeSeg(() => renderCompare(host, item))), el('div', { class: 'empty', style: 'padding:16px', text: 'Daily past-league prices are not available yet.' })); return; }
     const past = (await cmpShard(shardOf(item.n, idx.shards)))[item.n] || {};
     const today = M.leagueDay;
     const series = idx.leagues.filter((l) => past[l.name]).map((l, k) => ({ name: l.name, col: LCOL[k % LCOL.length], c: past[l.name], div: idx.divine[l.name] || [] }));
     const curArr = cur && cur.s ? cur.s[item.n] : null;
     if (curArr) series.unshift({ name: (M.league || 'Now') + ' (now)', col: ACC, c: curArr, div: cur.div || [], current: true });
-    if (!series.some((x) => !x.current)) { host.replaceChildren(el('div', { class: 'empty', style: 'padding:16px', text: 'No past-league prices for this item. It may be new this league, or never traded enough.' })); return; }
+    if (!series.some((x) => !x.current)) { host.replaceChildren(el('div', { class: 'cmp-bar' }, modeSeg(() => renderCompare(host, item))), el('div', { class: 'empty', style: 'padding:16px', text: 'No daily past-league prices for this item. It may be new this league, or never traded enough. Try Hourly.' })); return; }
     const draw = () => {
       const chartHost = el('div', { class: 'chart', style: 'min-height:220px' });
       const segU = el('div', { class: 'seg', role: 'group', 'aria-label': 'Unit' }, ...[['c', 'Chaos'], ['d', 'Divine']].map(([v, l]) => el('button', { type: 'button', 'aria-pressed': CMP.unit === v, onclick: () => { CMP.unit = v; draw(); } }, l)));
@@ -667,21 +697,90 @@ td.nm .ico{margin-top:-2px}
           el('td', { class: 'mono', text: pk ? `${fmtU(pk[1])} (day ${pk[0]})` : '—' }), el('td', { class: 'mono', text: lo ? `${fmtU(lo[1])} (day ${lo[0]})` : '—' })));
       });
       tbl.append(tb);
-      host.replaceChildren(el('div', { class: 'cmp-bar' }, segU, segR), legend, chartHost, tbl,
+      host.replaceChildren(el('div', { class: 'cmp-bar' }, modeSeg(() => renderCompare(host, item)), segU, segR), legend, chartHost, tbl,
         el('p', { class: 'mut', style: 'font-size:12px;margin:6px 0 0', text: 'Day 0 = first day of each league. Log scale, so equal steps mean equal % moves. Click a league to hide or show it.' }));
-      requestAnimationFrame(() => cmpChart(chartHost, series.filter((x) => !CMP.hidden.has(x.name)), val, fmtU, today));
+      requestAnimationFrame(() => cmpChart(chartHost, series.filter((x) => !CMP.hidden.has(x.name)), val, fmtU, today, null, item.n + ' · daily, this league vs past leagues'));
     };
     draw();
   }
-  function cmpChart(host, series, val, fmtU, today) {
+  // ---- hourly: past leagues' Faustus hours at the same league age (data/pastfx, refreshed twice a day)
+  async function hIndex() { if (CMP.hidx === undefined) { try { CMP.hidx = await fetch('data/pastfx/index.json?t=' + (M ? M.generatedAt : ''), { cache: 'no-store' }).then((r) => r.ok ? r.json() : null); } catch (e) { CMP.hidx = null; } } return CMP.hidx; }
+  async function hShard(k) { if (!(k in CMP.hshards)) { try { CMP.hshards[k] = await fetch(`data/pastfx/${k}.json?t=` + (CMP.hidx ? CMP.hidx.generatedAt : '')).then((r) => r.ok ? r.json() : {}); } catch (e) { CMP.hshards[k] = {}; } } return CMP.hshards[k]; }
+  async function renderCompareHourly(host, item) {
+    const redraw = () => renderCompare(host, item);
+    const bar = (...x) => el('div', { class: 'cmp-bar' }, modeSeg(redraw), ...x);
+    host.replaceChildren(bar(), el('div', { class: 'empty', style: 'padding:16px', text: 'Loading past leagues by the hour…' }));
+    const idx = await hIndex();
+    if (!idx) { host.replaceChildren(bar(), el('div', { class: 'empty', style: 'padding:16px', text: 'Hourly past-league prices are not available yet. They are fetched twice a day.' })); return; }
+    if (item.g === 'Uniques') { host.replaceChildren(bar(), el('div', { class: 'empty', style: 'padding:16px', text: 'Hourly history comes from the currency exchange, where uniques are not traded. Use Daily for uniques.' })); return; }
+    const past = (await hShard(shardOf(item.n, idx.shards)))[item.n] || {};
+    const t0 = Date.parse(idx.start + 'T00:00:00Z'), nowH = (Date.now() - t0) / 3600e3;
+    const hrs = d3.range(idx.n).map((k) => idx.h0 + k);
+    const series = idx.leagues.filter((l) => past[l.name]).map((l, k) => ({ name: l.name, col: LCOL[k % LCOL.length], pts: hrs.map((h, k2) => ({ h, c: past[l.name][k2], r: (idx.div[l.name] || [])[k2] })) }));
+    const sr = seriesFor(item.n);
+    if (sr) { const rates = hourRates(sr.t); series.unshift({ name: (M.league || 'Now') + ' (now)', col: ACC, current: true,
+      pts: sr.t.map((ts, k) => ({ h: (Date.parse(ts) - t0) / 3600e3, c: sr.s[k], r: item.n === 'Divine Orb' ? null : rates[k] })) }); }
+    if (!series.some((x) => !x.current)) { host.replaceChildren(bar(), el('div', { class: 'empty', style: 'padding:16px', text: 'No hourly past-league prices for this item. It may be new this league, or rarely traded on the exchange.' })); return; }
+    const segU = el('div', { class: 'seg', role: 'group', 'aria-label': 'Unit' }, ...[['c', 'Chaos'], ['d', 'Divine']].map(([v, l]) => el('button', { type: 'button', 'aria-pressed': CMP.unit === v, onclick: () => { CMP.unit = v; redraw(); } }, l)));
+    const isDivItem = item.n === 'Divine Orb';
+    const val = (p) => p.c == null ? null : CMP.unit === 'c' || isDivItem ? p.c : p.r ? p.c / p.r : null;
+    const fmtU = (v) => v == null ? '—' : CMP.unit === 'c' || isDivItem ? fmtC(v) + 'c' : fmtDv(v) + ' div';
+    const shown = series.filter((x) => !CMP.hidden.has(x.name));
+    const legend = el('div', { class: 'cmp-legend' }, ...series.map((x) => el('button', { type: 'button', 'aria-pressed': !CMP.hidden.has(x.name), onclick: () => { CMP.hidden.has(x.name) ? CMP.hidden.delete(x.name) : CMP.hidden.add(x.name); redraw(); } }, el('i', { style: `background:${x.col}` }), x.name)));
+    const at = (x, h) => { let best = null; x.pts.forEach((q) => { const d = Math.abs(q.h - h); if (d <= 1.5 && val(q) != null && (!best || d < best[0])) best = [d, val(q)]; }); return best ? best[1] : null; };
+    const H = Math.floor(nowH), tb = el('tbody');
+    series.forEach((x) => { const a = at(x, H), b = x.current ? null : at(x, H + 24), c4 = x.current ? null : at(x, H + 96);
+      const vals = x.pts.map(val).filter((v) => v != null);
+      tb.append(el('tr', {}, el('td', {}, el('i', { style: `display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;background:${x.col}` }), x.name),
+        el('td', { class: 'mono', text: fmtU(a) }), el('td', { class: 'mono ' + cls(a && b ? b / a - 1 : null), text: x.current ? '…' : pct(a && b ? (b / a - 1) * 100 : null) }),
+        el('td', { class: 'mono ' + cls(a && c4 ? c4 / a - 1 : null), text: x.current ? '…' : pct(a && c4 ? (c4 / a - 1) * 100 : null) }),
+        el('td', { class: 'mono', text: vals.length ? `${fmtU(d3.min(vals))} – ${fmtU(d3.max(vals))}` : '—' }))); });
+    const tbl = el('table', { class: 'cmp-tbl' }, el('thead', {}, el('tr', {}, ...['League', 'This hour', 'Next 24h', 'Next 4 days', 'Range shown'].map((h) => el('th', { text: h })))), tb);
+    const chartHost = el('div', { class: 'chart', style: 'min-height:220px' });
+    host.replaceChildren(bar(segU), legend, chartHost, tbl, el('p', { class: 'mut', style: 'font-size:12px;margin:6px 0 0', text: `Each past league at the same age as ${M.league || 'this league'} (3 days back to 4 days ahead), hour by hour from GGG's currency exchange. Log scale. Click the chart to expand.` }));
+    requestAnimationFrame(() => cmpHourChart(chartHost, shown, val, fmtU, nowH, null, item.n + ' · hourly, this league vs past leagues at the same age'));
+  }
+  function cmpHourChart(host, series, val, fmtU, nowH, Hz, title) {
     host.replaceChildren();
+    if (!Hz) zoomable(host, title, (h2, H2) => cmpHourChart(h2, series, val, fmtU, nowH, H2), cmpLegend(series));
+    const lines = series.map((x) => ({ ...x, P: x.pts.map((p) => ({ h: p.h, v: val(p) })).filter((p) => p.v != null && p.v > 0) })).filter((x) => x.P.length);
+    if (!lines.length) { host.append(el('div', { class: 'empty', text: 'Nothing to show.' })); return; }
+    const W = Math.max(280, host.clientWidth), Hh = Hz || 220, m = { t: 8, r: 10, b: 26, l: 10 };
+    const svg = d3.select(host).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${Hh}`).attr('role', 'img').attr('aria-label', 'Hourly price by league age, this league versus past leagues');
+    const allv = lines.flatMap((x) => x.P.map((p) => p.v)), allh = lines.flatMap((x) => x.P.map((p) => p.h));
+    const ex = d3.extent(allv), y = d3.scaleLog().domain([ex[0] / 1.06, ex[1] * 1.06]);
+    const probe = svg.append('text').attr('class', 'tick').append('tspan').text(fmtU(+y.domain()[1].toPrecision(2))); m.l = Math.ceil(probe.node().getComputedTextLength()) + 12; probe.node().parentNode.remove();
+    const x = d3.scaleLinear().domain(d3.extent(allh)).range([m.l, W - m.r]); y.range([Hh - m.b, m.t]);
+    const [ya, yb] = y.domain(), tv = ya === yb ? [ya] : d3.range(5).map((k) => Math.exp(Math.log(ya) + (Math.log(yb) - Math.log(ya)) * k / 4));
+    svg.append('g').attr('class', 'grid').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).tickValues(tv).tickSize(-(W - m.l - m.r)).tickFormat(''));
+    svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).tickValues(tv).tickFormat((v) => fmtU(+v.toPrecision(2)))).call((g) => g.select('.domain').remove());
+    const [hA, hB] = x.domain(), dayTicks = d3.range(Math.ceil(hA / 24) * 24, hB + 1, (hB - hA) / 24 > 8 && W < 600 ? 48 : 24);
+    svg.append('g').attr('transform', `translate(0,${Hh - m.b})`).call(d3.axisBottom(x).tickValues(dayTicks).tickFormat((h) => 'day ' + Math.round(h / 24)));
+    svg.append('line').attr('x1', x(nowH)).attr('x2', x(nowH)).attr('y1', m.t).attr('y2', Hh - m.b).attr('stroke', '#5d6573').attr('stroke-dasharray', '3 3');
+    svg.append('text').attr('x', x(nowH) + 4).attr('y', m.t + 10).attr('fill', '#8b93a1').attr('font-size', 11).text('now');
+    const line = d3.line().defined((p) => p.v != null).x((p) => x(p.h)).y((p) => y(p.v));
+    lines.slice().sort((a, b) => (a.current ? 1 : 0) - (b.current ? 1 : 0)).forEach((s2) => svg.append('path').datum(s2.P).attr('fill', 'none').attr('stroke', s2.col).attr('stroke-width', s2.current ? 2.6 : 1.4).attr('opacity', s2.current ? 1 : 0.85).attr('d', line));
+    const tip = d3.select(host).append('div').attr('class', 'tip').style('display', 'none');
+    const guide = svg.append('line').attr('y1', m.t).attr('y2', Hh - m.b).attr('stroke', '#8b93a1').style('display', 'none');
+    svg.append('rect').attr('x', m.l).attr('width', W - m.l - m.r).attr('height', Hh).attr('fill', 'transparent')
+      .on('pointermove', (ev) => { const [mx] = d3.pointer(ev); const h = Math.round(x.invert(mx));
+        guide.style('display', null).attr('x1', x(h)).attr('x2', x(h)); tip.style('display', null).selectAll('*').remove();
+        tip.append('div').attr('class', 'mut').text(`Day ${Math.floor(h / 24)}, ${String(((h % 24) + 24) % 24).padStart(2, '0')}:00 of the league` + (h > nowH ? ' (later than now)' : ''));
+        lines.forEach((s2) => { const p = s2.P.find((q) => Math.abs(q.h - h) < 0.5); if (p) tip.append('div').style('color', s2.col).text(`${s2.name}: ${fmtU(p.v)}`); });
+        const tw = tip.node().offsetWidth, sx = x(h) / W * host.clientWidth; tip.style('left', Math.max(0, Math.min(host.clientWidth - tw, sx + 12)) + 'px').style('top', '0px'); })
+      .on('pointerleave', () => { tip.style('display', 'none'); guide.style('display', 'none'); });
+  }
+  const cmpLegend = (series) => () => el('div', { class: 'cmp-legend' }, ...series.map((x) => el('span', { style: 'font-size:12px;display:inline-flex;align-items:center;gap:6px;color:var(--fg2);margin-right:10px' }, el('i', { style: `display:inline-block;width:10px;height:10px;border-radius:2px;background:${x.col}` }), x.name)));
+  function cmpChart(host, series, val, fmtU, today, Hz, title) {
+    host.replaceChildren();
+    if (!Hz) zoomable(host, title || 'Compare with past leagues', (h2, H2) => cmpChart(h2, series, val, fmtU, today, H2), cmpLegend(series));
     const maxD = Math.max(CMP.range === 120 ? d3.max(series, (x) => x.c.length - 1) || 30 : CMP.range, today + 1);
     const lines = series.map((x) => ({ ...x, pts: d3.range(0, maxD + 1).map((d) => ({ d, v: val(x, d) })).filter((p) => p.v != null && p.v > 0) })).filter((x) => x.pts.length);
     if (!lines.length) { host.append(el('div', { class: 'empty', text: 'Nothing to show for this range.' })); return; }
-    const W = Math.max(280, host.clientWidth), Hh = 220, m = { t: 8, r: 10, b: 26, l: 10 };
+    const W = Math.max(280, host.clientWidth), Hh = Hz || 220, m = { t: 8, r: 10, b: 26, l: 10 };
     const svg = d3.select(host).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${Hh}`).attr('role', 'img').attr('aria-label', 'Price by league day, this league versus past leagues');
     const all = lines.flatMap((x) => x.pts.map((p) => p.v));
-    const y = d3.scaleLog().domain(d3.extent(all)).nice();
+    const ex = d3.extent(all), y = d3.scaleLog().domain([ex[0] / 1.06, ex[1] * 1.06]);
     const probe = svg.append('text').attr('class', 'tick').append('tspan').text(fmtU(+y.domain()[1].toPrecision(2))); m.l = Math.ceil(probe.node().getComputedTextLength()) + 12; probe.node().parentNode.remove();
     const x = d3.scaleLinear().domain([0, maxD]).range([m.l, W - m.r]); y.range([Hh - m.b, m.t]);
     const [ya, yb] = y.domain(), tv = d3.range(5).map((k) => Math.exp(Math.log(ya) + (Math.log(yb) - Math.log(ya)) * k / 4));
@@ -787,7 +886,7 @@ td.nm .ico{margin-top:-2px}
     closeBtn.focus();
     CMP.unit = chartInDiv(i) ? 'd' : 'c';
     renderAbout(aboutHost, i);
-    requestAnimationFrame(() => { if (sr) hourlyChart(hourHost, sr, { aria: i.n + ' hourly price', div: chartInDiv(i) }); else hourHost.append(el('div', { class: 'empty', text: H ? 'No hourly history for this item yet.' : 'Loading hourly data…' })); dailyChart(dayHost, i); renderCompare(cmpHost, i); });
+    requestAnimationFrame(() => { if (sr) hourlyChart(hourHost, sr, { aria: i.n + ' hourly price', title: i.n + ' · hourly, last 48 hours' + (chartInDiv(i) ? ' · in Divines' : ' · in chaos'), div: chartInDiv(i) }); else hourHost.append(el('div', { class: 'empty', text: H ? 'No hourly history for this item yet.' : 'Loading hourly data…' })); dailyChart(dayHost, i); renderCompare(cmpHost, i); });
   }
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#drawerHost').children.length) closeDrawer(); });
 
@@ -905,8 +1004,9 @@ td.nm .ico{margin-top:-2px}
   }
 
   // today's holdings valued over the last 7 days, plus the three 7-day paths, all in Divines
-  function worthChart(host, held) {
+  function worthChart(host, held, Hz) {
     host.replaceChildren(); if (!held.length) return;
+    if (!Hz) zoomable(host, 'Worth of your holdings · last 7 days and next 7', (h2, H2) => worthChart(h2, held, H2), () => $('#trkChart').previousElementSibling.cloneNode(true));
     const d = M.divine, P = d3.utcParse('%Y-%m-%d');
     const fill = (arr, fb) => (arr || []).map((v, k, a) => v ?? a.slice(k).find((y) => y != null) ?? fb);
     const dh = fill(d.h, divRate());
@@ -917,7 +1017,7 @@ td.nm .ico{margin-top:-2px}
       { pts: path('hpth', d.fh), col: '#7aa2f7', dash: '5 4', w: 1.8, lab: 'Past leagues' }, { pts: path('f', d.f), col: UP, dash: '2 3', w: 1.8, lab: 'Call' }].filter((l) => l.pts && l.pts.length > 1);
     if (U === 'c') lines.forEach((l) => { l.pts = l.pts.map((p) => ({ ...p, v: p.c })); });
     const all = lines.flatMap((l) => l.pts);
-    const W = Math.max(280, host.clientWidth), Hh = 200, m = { t: 8, r: 10, b: 24, l: 10 };
+    const W = Math.max(280, host.clientWidth), Hh = Hz || 200, m = { t: 8, r: 10, b: 24, l: 10 };
     const svg = d3.select(host).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${Hh}`).attr('role', 'img').attr('aria-label', 'Worth of your holdings in Divines, last 7 days and 7-day predictions');
     const ext = d3.extent(all, (p) => p.v), pad = (ext[1] - ext[0]) * 0.08 || ext[1] * 0.05 || 1;
     const y = d3.scaleLinear().domain([Math.max(0, ext[0] - pad), ext[1] + pad]).nice(4);
