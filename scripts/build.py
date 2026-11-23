@@ -689,9 +689,18 @@ if __name__ == "__main__":
         cdn = "https://web.poecdn.com"
         names = {it["n"] for it in market["items"]} | {"Divine Orb", "Chaos Orb"}
         icons = {n: (u[len(cdn):] if u.startswith(cdn) else u) for n, u in ICONS.items() if n in names}
+        card = "/image/Art/2DItems/Divination/InventoryIcon.png"   # every divination card has the same inventory icon
+        for it in market["items"]:
+            if it["c"] == "Divination Cards" and it["n"] not in icons:
+                icons[it["n"]] = card
+        try:
+            with urllib.request.urlopen(urllib.request.Request(cdn + card, method="HEAD", headers={"User-Agent": UA}), timeout=20) as r:
+                print(f"card icon: HTTP {r.status}")
+        except Exception as e:
+            print(f"warn: card icon unreachable: {e}", file=sys.stderr)
         with open(f"{out_dir}/icons.json", "w") as fh:
             json.dump(icons, fh, ensure_ascii=False, separators=(",", ":"))
-        miss = [it for it in market["items"] if it["n"] not in icons]
+        miss = [it for it in market["items"] if re.sub(r" #\d+$", "", it["n"]) not in icons]
         print(f"icons: {len(icons)}; missing {len(miss)}: {dict(Counter(it['c'] for it in miss))} e.g. {[it['n'] for it in miss[:8]]}")
     with open(f"{out_dir}/hourly.json", "w") as fh:
         json.dump({"generatedAt": market["generatedAt"], "fxv": FX_VERSION, "nj": nj, "fx": fx}, fh, separators=(",", ":"))
