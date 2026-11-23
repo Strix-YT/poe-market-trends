@@ -253,7 +253,7 @@ td.nm .ico{margin-top:-2px}
     <div class="grid2">
       <section class="panel">
         <h3>Divine Orb · hourly</h3>
-        <p class="cap">Chaos per Divine on Faustus, last 48 hours: line = volume-weighted price, band = low–high rate, bars = Chaos traded</p>
+        <p class="cap">Chaos per Divine on Faustus, last 48 hours: line = volume-weighted price, band = low–high rate, bars = Divines traded</p>
         <div class="chart" id="divChart" style="min-height:200px"></div>
       </section>
       <section class="panel">
@@ -284,7 +284,7 @@ td.nm .ico{margin-top:-2px}
         <thead><tr>
           <th data-k="n">Item</th><th data-k="c">Type</th><th data-k="p" title="Chaos below 1 Divine, Divines above">Price</th><th data-k="c1">1h</th>
           <th data-k="sp" style="cursor:default;text-align:center">Last 24h</th><th data-k="c24">24h</th>
-          <th data-k="ft" title="If the current trend simply continues (momentum only)">7d trend</th><th data-k="fh" title="What this item did over the next 7 days at this point in past leagues (or its category, marked c)">7d past leagues</th><th data-k="sig" title="Backtested call: weighs both by what came true most often when replaying past leagues">Call</th><th data-k="liq">Liquidity</th><th style="cursor:default;text-align:center">Trade</th>
+          <th data-k="ft" title="If the current trend simply continues (momentum only)">7d trend</th><th data-k="fh" title="What this item did over the next 7 days at this point in past leagues (or its category, marked c)">7d past leagues</th><th data-k="sig" title="Backtested call: weighs both by what came true most often when replaying past leagues">Call</th><th data-k="liq" title="Currency: how many were traded in the last day. Uniques: how many are listed for sale.">Traded / day</th><th style="cursor:default;text-align:center">Trade</th>
         </tr></thead>
         <tbody id="tbody"><tr><td colspan="11" class="empty">Loading…</td></tr></tbody>
       </table>
@@ -342,7 +342,7 @@ td.nm .ico{margin-top:-2px}
   <details>
     <summary>How the numbers work</summary>
     <p><b>Hourly (1h, 6h, 24h):</b> for currency-exchange items, each hour's price is the volume-weighted average rate on Faustus for the last completed hour (GGG publishes each hour once it ends, so the newest point is up to an hour old). Uniques and cards aren't traded on Faustus, so their hourly moves come from hourly poe.ninja snapshots. Where hourly history is too short, 24h falls back to poe.ninja's daily change.</p>
-    <p><b>Two 7-day predictions</b>, both measured against the Divine Orb. <b>7d trend</b> assumes the current momentum continues: 75% of the last day's change plus 25% of the day before, fading 45% a day. <b>7d past leagues</b> is what the same item did over the next 7 days at this point in past leagues (median across leagues), or its category when the item has too little history (marked <sup>c</sup>). <b>Call</b> (Gain / Hold / Lose) blends the two in the way that came true most often when replaying the last five leagues day by day (<span id="btLeagues">—</span>): it expects big recent moves to partly pull back and adds half the category's usual move. <span id="btNote"></span> Gain or Lose means a projected move beyond ±10%. Confidence follows liquidity: currency by Chaos traded per day (High ≥ 20,000c, Medium ≥ 3,000c), Uniques by trade listings (High ≥ 100, Medium ≥ 25).</p>
+    <p><b>Two 7-day predictions</b>, both measured against the Divine Orb. <b>7d trend</b> assumes the current momentum continues: 75% of the last day's change plus 25% of the day before, fading 45% a day. <b>7d past leagues</b> is what the same item did over the next 7 days at this point in past leagues (median across leagues), or its category when the item has too little history (marked <sup>c</sup>). <b>Call</b> (Gain / Hold / Lose) blends the two in the way that came true most often when replaying the last five leagues day by day (<span id="btLeagues">—</span>): it expects big recent moves to partly pull back and adds half the category's usual move. <span id="btNote"></span> Gain or Lose means a projected move beyond ±10%. Confidence follows liquidity: currency by the chaos value traded per day (High ≥ 20,000c, Medium ≥ 3,000c), Uniques by trade listings (High ≥ 100, Medium ≥ 25).</p>
     <p>This is a short-term momentum read, not trading advice. Patches, new strategies and meta shifts move prices in ways no trend line can see.</p>
   </details>
 </footer>
@@ -374,6 +374,10 @@ td.nm .ico{margin-top:-2px}
   const fmtP = (p) => isDiv(p) ? fmtD(p / divRate()) + ' div' : fmtC(p) + 'c';
   const altP = (p) => isDiv(p) ? `≈ ${fmtC(p)}c` : (divRate() && p != null && p >= 1 ? `≈ ${d3.format('.2~r')(p / divRate())} div` : '');
   const cls = (v) => v == null ? 'dim' : v > 0 ? 'up' : v < 0 ? 'dn' : 'mut';
+  // how many items changed hands: chaos volume / chaos price
+  const fmtN = (n) => n == null || isNaN(n) ? '—' : n >= 1e3 ? d3.format('.3~s')(n).replace('G', 'B') : n >= 10 ? d3.format(',')(Math.round(n)) : d3.format('.2~r')(n);
+  const units = (i, vol) => vol != null && i.p ? vol / i.p : null;
+  const liqText = (i) => i.v != null ? fmtN(units(i, i.v)) + ' traded/day' : i.ls != null ? i.ls + ' listed' : '—';
   const short = (v) => v == null ? '—' : v >= 1e6 ? d3.format('.3~s')(v).replace('M', 'M') : v >= 1e3 ? d3.format('.3~s')(v) : d3.format(',')(Math.round(v));
   const el = (tag, attrs = {}, ...kids) => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'class') e.className = v; else if (k === 'text') e.textContent = v; else if (k.startsWith('on')) e.addEventListener(k.slice(2), v); else if (v != null) e.setAttribute(k, v); } kids.flat().forEach((k) => k != null && e.append(k)); return e; };
 
@@ -456,7 +460,7 @@ td.nm .ico{margin-top:-2px}
 
   // ---------------------------------------------------------------- derived
   const v24 = (i) => i.c24 ?? i.d1;
-  const val = (i, k) => k === 'c24' ? v24(i) : k === 'liq' ? (i.v ?? (i.ls != null ? i.ls * i.p : -1)) : i[k];
+  const val = (i, k) => k === 'c24' ? v24(i) : k === 'liq' ? (i.v != null ? units(i, i.v) : i.ls != null ? i.ls : -1) : i[k];
   function filtered() {
     const q = S.q.trim().toLowerCase(), pmin = parseFloat(S.pmin), pmax = parseFloat(S.pmax);
     return M.items.filter((i) => (S.market === 'all' || i.g === S.market) && S.cats.includes(i.c) && S.sig.includes(i.sig) && S.conf.includes(i.conf)
@@ -516,7 +520,7 @@ td.nm .ico{margin-top:-2px}
     if (!rows.length) { tb.replaceChildren(el('tr', {}, el('td', { colspan: 11, class: 'empty', text: 'No items match these filters.' }))); $('#moreBtn').hidden = true; return; }
     tb.replaceChildren(...rows.slice(0, shown).map((i) => {
       const sub = i.g === 'Uniques' ? [i.s, i.l ? i.l + 'L' : null].filter(Boolean).join(' · ') : (i.src === 'fx' ? 'Faustus hourly' : '');
-      const liq = i.v != null ? short(i.v) + 'c/day' : i.ls != null ? i.ls + ' listed' : '—';
+      const liq = liqText(i);
       const sc = i.sig === 'Gain' ? 'up' : i.sig === 'Lose' ? 'dn' : 'mut';
       const tr = el('tr', { tabindex: '0', title: 'Open details' },
         el('td', { class: 'nm' }, starBtn(i.n), icon(i.n), i.n, sub ? el('small', { text: sub }) : null),
@@ -552,7 +556,7 @@ td.nm .ico{margin-top:-2px}
     host.replaceChildren();
     const rt = opts.div ? hourRates(t) : null, cv = (x, k) => x == null ? null : rt ? (rt[k] ? x / rt[k] : null) : x;
     const fmtY = rt ? fmtDv : fmtC, suf = rt ? ' div' : 'c';
-    const pts = t.map((ts, k) => ({ t: new Date(ts), p: cv(s[k], k), lo: lo ? cv(lo[k], k) : null, hi: hi ? cv(hi[k], k) : null, v: v ? v[k] : null })).filter((d) => d.p != null);
+    const pts = t.map((ts, k) => ({ t: new Date(ts), p: cv(s[k], k), lo: lo ? cv(lo[k], k) : null, hi: hi ? cv(hi[k], k) : null, v: v && v[k] != null && s[k] ? v[k] / s[k] : null })).filter((d) => d.p != null);
     if (pts.length < 2) { host.append(el('div', { class: 'empty', text: 'Not enough hourly history yet.' })); return; }
     const W = Math.max(280, host.clientWidth), Hh = opts.h || 200, m = { t: 8, r: 10, b: 24, l: 10 };
     const svg = d3.select(host).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${Hh}`).attr('role', 'img').attr('aria-label', opts.aria || 'Hourly price chart');
@@ -576,7 +580,7 @@ td.nm .ico{margin-top:-2px}
         dot.style('display', null).attr('cx', x(d.t)).attr('cy', y(d.p)); tip.style('display', null).selectAll('*').remove();
         tip.append('div').attr('class', 'mut').text(d3.utcFormat('%-d %b %H:00 UTC')(d.t));
         tip.append('div').text(fmtY(d.p) + suf + (d.lo != null ? `  (${fmtY(d.lo)}–${fmtY(d.hi)})` : ''));
-        if (d.v != null) tip.append('div').attr('class', 'mut').text('traded ' + short(d.v) + 'c');
+        if (d.v != null) tip.append('div').attr('class', 'mut').text(fmtN(d.v) + (opts.unitName ? ' ' + opts.unitName : '') + ' traded that hour');
         const tw2 = tip.node().offsetWidth, sx = x(d.t) / W * host.clientWidth; tip.style('left', Math.max(0, Math.min(host.clientWidth - tw2, sx - tw2 / 2)) + 'px').style('top', '0px'); })
       .on('pointerleave', () => { tip.style('display', 'none'); dot.style('display', 'none'); });
   }
@@ -623,7 +627,7 @@ td.nm .ico{margin-top:-2px}
   function drawDivine() {
     const host = $('#divChart'); const sr = seriesFor('Divine Orb');
     if (!sr) { host.replaceChildren(el('div', { class: 'empty', text: H ? 'Hourly history is still building.' : 'Loading…' })); return; }
-    hourlyChart(host, sr, { aria: 'Divine Orb hourly price in chaos, last 48 hours' });
+    hourlyChart(host, sr, { aria: 'Divine Orb hourly price in chaos, last 48 hours', unitName: 'Divines' });
   }
 
 
@@ -769,12 +773,12 @@ td.nm .ico{margin-top:-2px}
         stat('7 days · current trend', pct(i.ft), cls(i.ft)),
         stat(i.fhs === 'category' ? `7 days · past leagues (${i.c})` : '7 days · past leagues', pct(i.fh), cls(i.fh)),
         stat('Backtested call', `${i.sig} (${pct(i.f7)}) · ${i.conf}`, 't'),
-        stat('Momentum', i.tr, 't'), stat('Liquidity', i.v != null ? short(i.v) + 'c/day' : i.ls != null ? i.ls + ' listed' : '—'),
-        i.vh != null ? stat('Traded last hour', short(i.vh) + 'c') : null,
+        stat('Momentum', i.tr, 't'), stat(i.v != null ? 'Traded per day' : 'Listed for sale', i.v != null ? fmtN(units(i, i.v)) : i.ls != null ? String(i.ls) : '—'),
+        i.vh != null ? stat('Traded last hour', fmtN(units(i, i.vh))) : null,
         null),
       callNote(i),
       el('section', {}, el('h3', { style: 'margin:6px 0 2px;font-size:14px', text: 'Hourly · last 48h' }),
-        el('p', { class: 'mut', style: 'font-size:12px;margin:0 0 8px', text: (sr && sr.src === 'fx' ? 'Faustus trades: line = volume-weighted price, band = low–high rate, bars = Chaos traded' : 'poe.ninja hourly snapshots') + (chartInDiv(i) ? '. Prices in Divines, at each hour\'s Divine rate.' : '. Prices in chaos.') }), hourHost),
+        el('p', { class: 'mut', style: 'font-size:12px;margin:0 0 8px', text: (sr && sr.src === 'fx' ? 'Faustus trades: line = volume-weighted price, band = low–high rate, bars = how many were traded each hour' : 'poe.ninja hourly snapshots') + (chartInDiv(i) ? '. Prices in Divines, at each hour\'s Divine rate.' : '. Prices in chaos.') }), hourHost),
       el('section', {}, el('h3', { style: 'margin:6px 0 2px;font-size:14px', text: 'Daily · since league start + both 7-day predictions' + (chartInDiv(i) ? ' · in Divines' : ' · in chaos') }),
         el('div', { class: 'legend' }, el('span', {}, el('i', { class: 'sw' }), 'Actual'), el('span', {}, el('i', { class: 'sw d' }), 'Current trend'), el('span', {}, el('i', { class: 'sw d', style: 'border-color:#7aa2f7' }), 'Like past leagues')), dayHost),
       el('section', {}, el('h3', { style: 'margin:6px 0 2px;font-size:14px', text: 'Compare with past leagues' }), cmpHost));

@@ -220,7 +220,9 @@ footer summary{cursor:pointer;color:var(--muted)}
 
   const v24 = (i) => i.c24 ?? i.d1;
   const val = (i, k) => k === 'c24' ? v24(i) : i[k];
-  const liqText = (i) => i.v != null ? short(i.v) + 'c traded/day' : i.ls != null ? i.ls + ' listed' : '';
+  const fmtN = (n) => n == null || isNaN(n) ? '—' : n >= 1e3 ? d3.format('.3~s')(n).replace('G', 'B') : n >= 10 ? d3.format(',')(Math.round(n)) : d3.format('.2~r')(n);
+  const units = (i, vol) => vol != null && i.p ? vol / i.p : null;
+  const liqText = (i) => i.v != null ? fmtN(units(i, i.v)) + ' traded/day' : i.ls != null ? i.ls + ' listed' : '';
   const nFilters = () => ['pmin', 'pmax', 'sub', 'links'].filter((k) => S[k] !== '').length + (S.conf !== DEF.conf ? 1 : 0);
 
   function inTab(i) {
@@ -383,7 +385,7 @@ footer summary{cursor:pointer;color:var(--muted)}
         tradeLink(i, 'Search on official trade ↗') ? el('div', { style: 'margin-top:10px' }, tradeLink(i, 'Search on official trade ↗')) : null),
       el('div', { class: 'stats' }, stat('Last hour', pct(i.c1), cls(i.c1)), stat('24 hours', pct(v24(i)), cls(v24(i))), stat('7-day outlook', pct(i.f7), cls(i.f7)),
         stat('7d if trend continues', pct(i.ft), cls(i.ft)), stat(i.fhs === 'category' ? '7d like past leagues (category)' : '7d like past leagues', pct(i.fh), cls(i.fh)),
-        stat('Since first traded', pct(i.chg), cls(i.chg)), stat('Trades', i.v != null ? short(i.v) + 'c/day' : i.ls != null ? i.ls + ' listed' : '—'), stat('Confidence', i.conf),
+        stat('Since first traded', pct(i.chg), cls(i.chg)), stat(i.v != null ? 'Traded per day' : 'Listed for sale', i.v != null ? fmtN(units(i, i.v)) : i.ls != null ? String(i.ls) : '—'), stat('Confidence', i.conf),
         null),
       el('section', {}, el('h3', { style: 'font-size:15px;margin:0 0 6px', text: 'Last 48 hours' }), hourHost),
       el('section', {}, el('h3', { style: 'font-size:15px;margin:0 0 6px', text: 'Daily, with 7-day outlook (dashed)' }), dayHost));
