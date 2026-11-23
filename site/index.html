@@ -151,6 +151,8 @@ footer details{margin-top:6px}
 tr.hit{background:rgba(232,176,74,.09)}
 tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .hitlab{font-size:11px;font-weight:600;color:var(--accent);display:block;text-align:right;margin-top:2px}
+.nmlink{background:none;border:0;padding:0;color:var(--fg);font:inherit;font-weight:500;cursor:pointer;text-align:left}.nmlink:hover{color:var(--accent);text-decoration:underline}
+#trkBody tr{cursor:default}
 .rm{background:none;border:0;color:var(--dim);cursor:pointer;font-size:14px;padding:2px 6px}.rm:hover{color:var(--dn)}
 .alloc{display:flex;flex-direction:column;gap:8px}
 .alloc .r{display:grid;grid-template-columns:minmax(90px,170px) 1fr 64px;gap:10px;align-items:center;font-size:12px}
@@ -799,6 +801,13 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
   const fmtWorthD = (d) => d == null || isNaN(d) ? '—' : (d >= 1000 ? d3.format(',.0f')(d) : d >= 10 ? d3.format(',.1f')(d) : d3.format(',.2f')(d)) + ' div';
   const fmtWorthC = (c) => c == null || isNaN(c) ? '—' : d3.format(',.0f')(c) + 'c';
 
+  // re-render after an edit without stealing the cursor: wait for focus to move, then put it back on the same field
+  let trkTimer = null;
+  function trkLater() { clearTimeout(trkTimer); trkTimer = setTimeout(() => {
+    const a = document.activeElement, k = a && a.dataset ? a.dataset.k : null, st = k ? [a.selectionStart, a.selectionEnd] : null;
+    renderTracker();
+    if (k) { const b = [...$$('#trkBody input')].find((x) => x.dataset.k === k); if (b) { b.focus(); try { b.setSelectionRange(st[0], st[1]); } catch (e) {} } }
+  }, 0); }
   function renderTracker() {
     if (!M) return;
     $('#trkQuick').replaceChildren(el('span', { class: 'dim', text: 'Quick add:' }), ...QUICK.filter((n) => getItem(n) && !isTracked(n)).map((n) => el('button', { class: 'pill', type: 'button', text: '+ ' + n, onclick: () => { track(n); renderTracker(); renderTable(); } })));
@@ -834,13 +843,13 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
     tb.replaceChildren(...srt.map(({ x, i }) => {
       const rm = el('button', { class: 'rm', type: 'button', title: 'Stop tracking', 'aria-label': 'Stop tracking ' + x.n, text: '✕', onclick: () => { untrack(x.n); renderTracker(); renderTable(); updateBadge(); } });
       if (!i) return el('tr', {}, el('td', { class: 'nm' }, x.n, el('small', { text: 'Not priced this hour (too few trades)' })), el('td', { colspan: 10 }), el('td', {}, rm));
-      const qIn = el('input', { class: 'tin q', inputmode: 'decimal', value: x.q || '', placeholder: '0', 'aria-label': 'How many ' + x.n });
-      qIn.addEventListener('change', () => { x.q = Math.max(0, parseFloat(qIn.value.replace(/,/g, '')) || 0); tsave(); renderTracker(); });
-      const aIn = (key, ph) => { const inp = el('input', { class: 'tin a', value: x[key], placeholder: ph, 'aria-label': (key === 'hi' ? 'Alert above, ' : 'Alert below, ') + x.n });
-        inp.addEventListener('change', () => { x[key] = inp.value.trim(); tsave(); renderTracker(); updateBadge(); }); return inp; };
+      const qIn = el('input', { class: 'tin q', inputmode: 'decimal', value: x.q || '', placeholder: '0', 'data-k': x.n + '|q', 'aria-label': 'How many ' + x.n });
+      qIn.addEventListener('change', () => { x.q = Math.max(0, parseFloat(qIn.value.replace(/,/g, '')) || 0); tsave(); trkLater(); });
+      const aIn = (key, ph) => { const inp = el('input', { class: 'tin a', value: x[key], placeholder: ph, 'data-k': x.n + '|' + key, 'aria-label': (key === 'hi' ? 'Alert above, ' : 'Alert below, ') + x.n });
+        inp.addEventListener('change', () => { x[key] = inp.value.trim(); tsave(); updateBadge(); trkLater(); }); return inp; };
       const hit = alertHit(x, i), sc = i.sig === 'Gain' ? 'up' : i.sig === 'Lose' ? 'dn' : 'mut';
-      const tr = el('tr', { class: hit ? 'hit' : '', tabindex: '0', title: 'Open details' },
-        el('td', { class: 'nm' }, x.n, el('small', { text: i.unit ? 'Prices are quoted in chaos' : x.n === 'Divine Orb' ? 'Moves shown in chaos' : i.c })),
+      const tr = el('tr', { class: hit ? 'hit' : '' },
+        el('td', { class: 'nm' }, el('button', { class: 'nmlink', type: 'button', title: 'Open details', text: x.n, onclick: () => openDrawer(i) }), el('small', { text: i.unit ? 'Prices are quoted in chaos' : x.n === 'Divine Orb' ? 'Moves shown in chaos' : i.c })),
         el('td', {}, qIn),
         el('td', { class: 'mono', title: altP(i.p), text: x.n === 'Divine Orb' ? fmtC(i.p) + 'c' : fmtP(i.p) }),
         el('td', { class: 'mono ' + cls(i.c1), text: pct(i.c1) }),
@@ -853,8 +862,6 @@ tr.hit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
         el('td', {}, el('div', { style: 'display:flex;gap:4px;justify-content:flex-end' }, aIn('hi', '≥ price'), aIn('lo', '≤ price')),
           hit ? el('span', { class: 'hitlab', text: hit === 'up' ? '▲ Above your alert' : '▼ Below your alert' }) : null),
         el('td', {}, rm));
-      tr.addEventListener('click', (e) => { if (!e.target.closest('button,a,input')) openDrawer(i); });
-      tr.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target === tr) openDrawer(i); });
       return tr;
     }));
     $('#trkUnit').textContent = U === 'c' ? 'chaos' : 'Divines';
