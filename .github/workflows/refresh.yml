@@ -32,7 +32,13 @@ jobs:
         with:
           ref: curves
           path: site/data/curves
-      - run: rm -rf site/data/curves/.git
+      - name: Past-league hourly prices
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          ref: pastfx
+          path: site/data/pastfx
+      - run: rm -rf site/data/curves/.git site/data/pastfx/.git site/data/pastfx/cache
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"

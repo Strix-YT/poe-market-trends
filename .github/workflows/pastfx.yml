@@ -1,0 +1,54 @@
+name: Past leagues hourly
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 */12 * * *"   # twice a day: slides the past-league hourly window along with the current league
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: pastfx
+  cancel-in-progress: false
+
+jobs:
+  pastfx:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Past-league daily index (league names and start dates)
+        uses: actions/checkout@v4
+        with:
+          ref: curves
+          path: curves
+      - name: Previous hourly window (cache)
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          ref: pastfx
+          path: pastfx
+      - run: rm -rf pastfx/.git
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Fetch past leagues' hours from GGG's currency exchange
+        env:
+          LEAGUE: Covens
+          LEAGUE_START: "2026-11-14"
+        run: python scripts/pastfx.py pastfx curves/index.json
+      - name: Publish to the 'pastfx' branch (replaced each run, no history kept)
+        run: |
+          cd pastfx
+          git init -q -b pastfx
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Past-league hourly prices"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" pastfx
+      - name: Redeploy the site
+        run: gh workflow run refresh.yml --ref main
+        env:
+          GH_TOKEN: ${{ github.token }}

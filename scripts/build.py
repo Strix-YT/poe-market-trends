@@ -164,9 +164,10 @@ def fx_hour(h):
     return j
 
 
-def fx_prices(j):
-    """Per item (metadata id): chaos VWAP, chaos volume, low and high rate, for LEAGUE in one hour."""
-    mk = [m for m in j.get("markets") or [] if m.get("league") == LEAGUE]
+def fx_prices(j, league=None):
+    """Per item (metadata id): chaos VWAP, chaos volume, low and high rate, for one league (default LEAGUE) in one hour."""
+    league = league or LEAGUE
+    mk = [m for m in j.get("markets") or [] if m.get("league") == league]
     out = {}
 
     def add(x, other, rate_other):
@@ -229,6 +230,43 @@ def fx_name(meta_id):
     return next(iter(names)) if names and len(names) == 1 else None
 
 
+def clean_fx(out, names):
+    """Blank out item-hours that are thin or far off-market. out = {"s": {name: [...]}, "v": {...}, optional "lo"/"hi"}."""
+    keys = [k for k in ("s", "lo", "hi") if k in out]
+    # a lone tiny trade can print an absurd rate: drop hours with negligible volume for that item
+    dropped = 0
+    for n in names:
+        vols = [x for x in out["v"][n] if x]
+        if not vols:
+            continue
+        floor = max(MIN_FX_HOUR_VOLUME, 0.05 * sorted(vols)[len(vols) // 2])
+        for i, x in enumerate(out["v"][n]):
+            if out["s"][n][i] is not None and (x or 0) < floor:
+                for k in keys:
+                    out[k][n][i] = None
+                dropped += 1
+    # an hour far from its neighbours on below-normal volume is a misprint, not a move
+    for n in names:
+        S, V = out["s"][n], out["v"][n]
+        valid = [i for i, x in enumerate(S) if x is not None]
+        vols = sorted(V[i] or 0 for i in valid)
+        if len(valid) < 4 or not vols:
+            continue
+        med_v = vols[len(vols) // 2]
+        bad = []
+        for pos, i in enumerate(valid):
+            nb = [S[j] for j in valid[max(0, pos - 3):pos] + valid[pos + 1:pos + 4]]
+            nb.sort()
+            ref = nb[len(nb) // 2]
+            if ref and abs(S[i] / ref - 1) > 0.35 and (V[i] or 0) < med_v:
+                bad.append(i)
+        for i in bad:
+            for k in keys:
+                out[k][n][i] = None
+        dropped += len(bad)
+    return dropped
+
+
 def update_fx(prev, now, known=None, keep=HOURLY_KEEP_HOURS):
     """Rolling hourly Faustus series {t, s, v, lo, hi}; fills any missing hour in the window."""
     last = int(now.timestamp()) // 3600 * 3600 - 3600
@@ -266,37 +304,7 @@ def update_fx(prev, now, known=None, keep=HOURLY_KEEP_HOURS):
     out = {"t": times}
     for k in ("s", "v", "lo", "hi"):
         out[k] = {n: [rows[t][k].get(n) for t in times] for n in names}
-    # a lone tiny trade can print an absurd rate: drop hours with negligible volume for that item
-    dropped = 0
-    for n in names:
-        vols = [x for x in out["v"][n] if x]
-        if not vols:
-            continue
-        floor = max(MIN_FX_HOUR_VOLUME, 0.05 * sorted(vols)[len(vols) // 2])
-        for i, x in enumerate(out["v"][n]):
-            if out["s"][n][i] is not None and (x or 0) < floor:
-                for k in ("s", "lo", "hi"):
-                    out[k][n][i] = None
-                dropped += 1
-    # an hour far from its neighbours on below-normal volume is a misprint, not a move
-    for n in names:
-        S, V = out["s"][n], out["v"][n]
-        valid = [i for i, x in enumerate(S) if x is not None]
-        vols = sorted(V[i] or 0 for i in valid)
-        if len(valid) < 4 or not vols:
-            continue
-        med_v = vols[len(vols) // 2]
-        bad = []
-        for pos, i in enumerate(valid):
-            nb = [S[j] for j in valid[max(0, pos - 3):pos] + valid[pos + 1:pos + 4]]
-            nb.sort()
-            ref = nb[len(nb) // 2]
-            if ref and abs(S[i] / ref - 1) > 0.35 and (V[i] or 0) < med_v:
-                bad.append(i)
-        for i in bad:
-            for k in ("s", "lo", "hi"):
-                out[k][n][i] = None
-        dropped += len(bad)
+    dropped = clean_fx(out, names)
     print(f"faustus: dropped {dropped} thin or off-market item-hours")
     print(f"faustus: {fetched} hours fetched, {missing} unavailable, {len(times)} in window, {len(names)} items mapped")
     return out
