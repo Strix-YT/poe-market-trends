@@ -691,7 +691,8 @@ if __name__ == "__main__":
         icons = {n: (u[len(cdn):] if u.startswith(cdn) else u) for n, u in ICONS.items() if n in names}
         with open(f"{out_dir}/icons.json", "w") as fh:
             json.dump(icons, fh, ensure_ascii=False, separators=(",", ":"))
-        print(f"icons: {len(icons)}")
+        miss = [it for it in market["items"] if it["n"] not in icons]
+        print(f"icons: {len(icons)}; missing {len(miss)}: {dict(Counter(it['c'] for it in miss))} e.g. {[it['n'] for it in miss[:8]]}")
     with open(f"{out_dir}/hourly.json", "w") as fh:
         json.dump({"generatedAt": market["generatedAt"], "fxv": FX_VERSION, "nj": nj, "fx": fx}, fh, separators=(",", ":"))
     c = Counter((it["g"], it["sig"]) for it in market["items"])
