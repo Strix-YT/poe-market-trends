@@ -1,27 +1,16 @@
-import json, urllib.request, urllib.parse
-UA={"User-Agent":"poe-market-trends probe (github.com/Strix-YT/poe-market-trends)"}
+import urllib.request, re, html
+UA={"User-Agent":"Mozilla/5.0 (compatible; poe-market-trends/1.0; +https://github.com/Strix-YT/poe-market-trends)"}
 def get(u):
-    with urllib.request.urlopen(urllib.request.Request(u,headers=UA),timeout=60) as r: return json.load(r)
-for u in ["https://repoe-fork.github.io/base_items.min.json"]:
+    with urllib.request.urlopen(urllib.request.Request(u,headers=UA),timeout=60) as r: return r.status, r.read().decode('utf-8','replace')
+try:
+    st,t=get("https://poedb.tw/robots.txt"); print("ROBOTS",st); print(t[:1500])
+except Exception as e: print("ROBOTS fail",e)
+for n in ["Golden_Oil","Tattoo_of_the_Tasalio_Scout","House_of_Mirrors","Mirror_Shard","Kalguuran_Runegraft_of_Bellows","Mageblood","Delirium_Orb_of_Diviners"]:
     try:
-        d=get(u); print("REPOE", u, len(d))
-        want={'Chaos Orb','Divine Orb','Mirror Shard','Deafening Essence of Greed','Pristine Fossil','Golden Oil','Omen of Fortune',"Hinekora's Lock",'House of Mirrors','Fracturing Orb','Gilded Divination Scarab','Fragment of the Phoenix','Simulacrum','Tattoo of the Tasalio Scout','Delirium Orb of Diviners' ,'Kalguuran Runegraft of Bellows','Exceptional Eldritch Ember','Chronicle of Atzoatl','Exalted Orb','Orb of Annulment'}
-        for k,v in d.items():
-            if v.get('name') in want: print("  ",v['name'],'|',v.get('item_class'),'|',json.dumps(v.get('properties'))[:400], '| keys', list(v.keys()))
-    except Exception as e: print("REPOE fail",u,e)
-B="https://poe.ninja/poe1/api/economy/stash/current/item/overview"
-for t in ["DivinationCard","Essence","Fossil","Oil","Scarab","Omen","Tattoo","Runegraft","DeliriumOrb","Artifact","Resonator","UniqueWeapon","AllflameEmber","Astrolabe"]:
-    try:
-        j=get(B+"?"+urllib.parse.urlencode({"league":"Covens","type":t})); L=j.get("lines",[])
-        print("NINJA",t,len(L)); 
-        if L: x=L[0]; print("   keys",list(x.keys())); print("   sample",json.dumps({k:x.get(k) for k in ['name','baseType','implicitModifiers','explicitModifiers','flavourText','stackSize','mutatedModifiers','itemClass','levelRequired']})[:700])
-    except Exception as e: print("NINJA fail",t,e)
-for t in ["Currency","Fragment"]:
-    try:
-        j=get("https://poe.ninja/poe1/api/economy/stash/current/currency/overview?"+urllib.parse.urlencode({"league":"Covens","type":t}))
-        print("NINJA-CUR",t,list(j.keys()), json.dumps((j.get("currencyDetails") or [{}])[0])[:300])
-    except Exception as e: print("NINJA-CUR fail",t,e)
-    try:
-        j=get("https://poe.ninja/poe1/api/economy/exchange/current/overview?"+urllib.parse.urlencode({"league":"Covens","type":t}))
-        print("EXCH",t,list(j.keys()), json.dumps((j.get("items") or [{}])[0])[:300])
-    except Exception as e: print("EXCH fail",t,e)
+        st,t=get("https://poedb.tw/us/"+n)
+        print("PAGE",n,st,len(t))
+        for cls in ['explicitMod','implicitMod','enchantMod','flavourText','divinationCard','itemboxstats','secDescrText','descrText','property']:
+            m=[html.unescape(re.sub('<[^>]+>',' ',x)).strip() for x in re.findall(r'<div class="'+cls+r'"[^>]*>(.*?)</div>',t,re.S)][:4]
+            if m: print("   ",cls,m)
+        i=t.find('itemboxstats'); print("   RAW", re.sub(r'\s+',' ',t[i-200:i+1200]) if i>0 else t[:600].replace('\n',' '))
+    except Exception as e: print("PAGE fail",n,e)
