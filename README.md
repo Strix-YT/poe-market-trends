@@ -12,6 +12,10 @@ Hourly trades come from GGG's own [currency exchange API](https://www.pathofexil
 - `/simple/` — a simplified, phone-first layout with category tabs and item cards.
 - `/#tracker` — **Tracker** tab: pick currencies or items to follow (☆ on any market row, quick-add, or search), optionally enter how many you hold, and see net worth in Divines, the 24h change, a 7-day value chart with all three predictions, allocation, and price alerts (type `150` for chaos or `2d` for Divines). Saved in the browser's localStorage, with Export/Import to move it between devices.
 
+## Past leagues by the hour
+
+`scripts/pastfx.py` (workflow `Past leagues hourly`, twice a day) fetches GGG's hourly currency-exchange digests for each past league at the same age as the current league (3 days back to 4 days ahead), cleans them with the same misprint filter as the live data, and publishes them to the orphan `pastfx` branch. The deploy serves them at `data/pastfx/`; item details show them under Compare with past leagues → Hourly. Every chart on the site can be clicked to open a large view.
+
 ## Item info
 
 Opening an item shows **what it is and does**. Currency-exchange items use text cached from [poedb.tw](https://poedb.tw/us/) by the weekly `Item info from poedb` workflow (`scripts/poedb.py` → `data/poedb.json`, about one page every 1.5 s, refreshing entries older than 30 days), with the game's own short descriptions from RePoE as a fallback; divination card rewards come from RePoE; unique mods come from poe.ninja. The hourly build merges these into `site/data/info.json`. Each item links to its poedb page.
