@@ -17,7 +17,7 @@ UA = "Mozilla/5.0 (compatible; poe-market-trends/1.0; +https://github.com/Strix-
 
 
 def slug(name):
-    return urllib.parse.quote(name.replace(" ", "_"), safe="_")
+    return urllib.parse.quote(name.replace(" ", "_"), safe="_'")
 
 
 def clean(s):
@@ -55,7 +55,8 @@ def main():
     market = json.load(urllib.request.urlopen(req, timeout=60))
     names = ["Divine Orb", "Chaos Orb"] + [i["n"] for i in market["items"] if i["g"] == "Exchange"]
     today = datetime.date.today()
-    stale = lambda e: (today - datetime.date.fromisoformat(e.get("t", "2000-01-01"))).days > MAX_AGE_DAYS
+    # pages that weren't found are retried every run (cheap: usually a handful)
+    stale = lambda e: not e.get("ok") or (today - datetime.date.fromisoformat(e.get("t", "2000-01-01"))).days > MAX_AGE_DAYS
     todo = [n for n in dict.fromkeys(names) if n not in cache or stale(cache[n])][:MAX_FETCH]
     print(f"{len(names)} items, {len(todo)} to fetch")
     ok = miss = 0
