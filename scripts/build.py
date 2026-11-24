@@ -48,7 +48,7 @@ EXCHANGE_TYPES = {
     "Resonator": "Resonators", "Oil": "Oils", "DeliriumOrb": "Delirium Orbs", "Omen": "Omens",
     "Tattoo": "Tattoos", "Artifact": "Artifacts", "DivinationCard": "Divination Cards",
     "Runegraft": "Runegrafts", "AllflameEmber": "Allflame Embers", "Astrolabe": "Astrolabes",
-    "Scarab": "Scarabs",
+    "Scarab": "Scarabs", "Thread": "Threads", "EnshroudingCrystal": "Enshrouding Crystals", "Ducat": "Ducats",
 }
 UNIQUE_TYPES = {
     "UniqueWeapon": "Unique Weapons", "UniqueArmour": "Unique Armours", "UniqueAccessory": "Unique Accessories",
