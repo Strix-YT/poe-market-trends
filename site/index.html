@@ -357,6 +357,7 @@ td.nm .ico{margin-top:-2px}
 <div id="drawerHost"></div>
 
 <script>
+const PAGE_BUILD = '__BUILD__';
 (() => {
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -411,6 +412,8 @@ td.nm .ico{margin-top:-2px}
   // ---------------------------------------------------------------- data
   async function load(first) {
     const j = await fetch('data/market.json?t=' + Date.now(), { cache: 'no-store' }).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    // a page left open (or cached by the browser) can be older than the data: reload once onto the new version
+    if (j.build && PAGE_BUILD !== '__' + 'BUILD__' && j.build !== PAGE_BUILD) { try { if (sessionStorage.getItem('em-reload') !== j.build) { sessionStorage.setItem('em-reload', j.build); location.reload(); return; } } catch (e) {} }
     const changed = !M || M.generatedAt !== j.generatedAt;
     M = j; H = null; if (changed) INFO = undefined;
     if (first || changed) { buildFilters(); render(); loadHourly(); loadIcons().then(() => { if (!M) return; renderTable(); if (view() === 'tracker') renderTracker(); }); }

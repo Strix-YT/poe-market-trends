@@ -477,7 +477,7 @@ def build(recs, now):
             "ft": ft, "fh": fh, "fhs": hist_src, "tp": tpath, "hpth": hpath,
         })
     market = {
-        "generatedAt": now.isoformat(timespec="seconds"), "league": LEAGUE,
+        "generatedAt": now.isoformat(timespec="seconds"), "build": os.environ.get("GITHUB_SHA", "")[:7], "league": LEAGUE,
         "days": days, "fdays": fdays,
         "divine": {"h": [r4(x) for x in dh], "f": [r4(x) for x in div_fc], "ft": [r4(x) for x in div_trend],
                    "fh": None if div_prior is None else [r4(x) for x in div_hist]},
