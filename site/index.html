@@ -113,6 +113,13 @@ td.nm small{display:block;color:var(--dim);font-weight:400;font-size:11px}
 .bld{padding:18px 22px 40px;display:flex;flex-direction:column;gap:16px}
 .bld .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 #bldAcct{flex:0 1 300px;min-width:200px}
+.bmk{display:inline-flex;align-items:center;border:1px solid var(--line2);border-radius:999px;background:var(--panel2);overflow:hidden}
+.bmk button{background:none;border:0;color:var(--fg);font:inherit;font-size:12px;padding:5px 10px;cursor:pointer}
+.bmk button:hover{color:var(--accent)}.bmk .ic{padding:5px 7px;color:var(--dim)}.bmk .ic:hover{color:var(--fg)}
+.bmk b{color:var(--accent);font-weight:600}.bmk small{color:var(--dim);margin-left:5px}
+.bmk input{background:none;border:0;color:var(--fg);font:inherit;font-size:12px;padding:5px 10px;width:130px;outline:none}
+.lgh{display:flex;align-items:baseline;gap:8px;margin:14px 0 6px;font-size:13px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.lgh small{font-weight:400;text-transform:none;letter-spacing:0;color:var(--dim)}
 .chars{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
 .charc{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;text-align:left;color:var(--fg);cursor:pointer;font:inherit}
 .charc:hover,.charc[aria-pressed=true]{border-color:var(--accent)}
@@ -363,13 +370,15 @@ td.nm .ico{margin-top:-2px}
   <div class="row">
     <input id="bldAcct" class="inp" placeholder="Account name, e.g. Name#1234" autocomplete="off" aria-label="Path of Exile account name with #1234">
     <button class="btn" type="button" id="bldGo">Find characters</button>
-    <label class="note" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="bldAll"> Show all leagues</label>
+    <button class="btn2" type="button" id="bldMark" hidden>☆ Bookmark</button>
     <span id="bldMsg" class="note" role="status"></span>
   </div>
+  <div class="row" id="bldMarks"></div>
   <div class="row" id="bldRecent"></div>
-  <div class="chars" id="bldChars"></div>
+  <div class="row" id="bldLeagues" role="group" aria-label="Filter characters by league"></div>
+  <div id="bldChars"></div>
   <div id="bldChar"></div>
-  <p class="note">Works with public profiles only (pathofexile.com → My Account → Privacy). The account name is case-sensitive and includes the #1234 tag. Gear prices are for uniques; rares and gems are not priced.</p>
+  <p class="note">Bookmarks and recent accounts are saved in this browser. Works with public profiles only (pathofexile.com → My Account → Privacy). The account name is case-sensitive and includes the #1234 tag. Gear prices are for uniques; rares and gems are not priced.</p>
 </div>
 
 <div class="trk" id="viewTracker" hidden>
@@ -1214,8 +1223,12 @@ const PAGE_BUILD = '__BUILD__';
   // The import server (worker/index.js, a Cloudflare Worker) reads public profiles the way Path of Building does.
   const IMPORT_API = 'https://poe-market-trends-import.rugvedbauskar.workers.dev';
   const B = { acct: '', chars: null, sel: null, data: null, open: new Set() };
-  try { const s0 = JSON.parse(localStorage.getItem('em-builds') || 'null'); if (s0) { B.recent = s0.recent || []; } } catch (e) {} B.recent = B.recent || [];
-  const bsave = () => { try { localStorage.setItem('em-builds', JSON.stringify({ recent: B.recent.slice(0, 6) })); } catch (e) {} };
+  // bookmarks: [{acct, label}], kept in this browser; recent: last accounts looked up
+  try { const s0 = JSON.parse(localStorage.getItem('em-builds') || 'null'); if (s0) { B.recent = s0.recent || []; B.marks = (s0.marks || []).filter((m) => m && typeof m.acct === 'string').slice(0, 50); } } catch (e) {}
+  B.recent = B.recent || []; B.marks = B.marks || []; B.league = null;
+  const bsave = () => { try { localStorage.setItem('em-builds', JSON.stringify({ recent: B.recent.slice(0, 6), marks: B.marks })); } catch (e) {} };
+  const isMarked = (a) => B.marks.some((m) => m.acct.toLowerCase() === (a || '').toLowerCase());
+  function toggleMark(a) { if (isMarked(a)) B.marks = B.marks.filter((m) => m.acct.toLowerCase() !== a.toLowerCase()); else B.marks.push({ acct: a, label: '' }); bsave(); renderBuilds(); }
   async function api(path, params) {
     if (!IMPORT_API) throw new Error('Character import is still being set up. It will be available shortly.');
     const r = await fetch(IMPORT_API + path + '?' + new URLSearchParams(params));
@@ -1246,7 +1259,7 @@ const PAGE_BUILD = '__BUILD__';
     const acct = $('#bldAcct').value.trim().replace(/\s+/g, ''), msg = $('#bldMsg');
     if (!/^[^#]{2,40}#\d{4}$/.test(acct)) { msg.textContent = 'Enter the account name with its #1234 tag, e.g. Name#1234.'; return; }
     msg.textContent = 'Looking up ' + acct + '…'; $('#bldChars').replaceChildren(); $('#bldChar').replaceChildren(); B.sel = null;
-    try { B.chars = await api('/characters', { account: acct }); B.acct = acct; if (B.staleNote) setTimeout(() => { $('#bldMsg').textContent = B.staleNote; }, 0);
+    try { B.chars = await api('/characters', { account: acct }); B.acct = acct; B.league = null; if (B.staleNote) setTimeout(() => { $('#bldMsg').textContent = B.staleNote; }, 0);
       B.recent = [acct, ...B.recent.filter((a) => a.toLowerCase() !== acct.toLowerCase())]; bsave();
       msg.textContent = ''; renderBuilds();
     } catch (e) { B.chars = null; msg.textContent = e.message; }
@@ -1257,13 +1270,34 @@ const PAGE_BUILD = '__BUILD__';
     try { B.data = await api('/character', { account: B.acct, name }); renderBuilds(); host.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     catch (e) { host.replaceChildren(el('div', { class: 'empty', text: e.message })); }
   }
+  const openAcct = (a) => { $('#bldAcct').value = a; findChars(); };
+  function markChip(m) {
+    if (m.editing) { const inp = el('input', { value: m.label || '', placeholder: 'Nickname', 'aria-label': 'Nickname for ' + m.acct });
+      const done = () => { m.label = inp.value.trim().slice(0, 30); delete m.editing; bsave(); renderBuilds(); };
+      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') done(); if (e.key === 'Escape') { delete m.editing; renderBuilds(); } }); inp.addEventListener('blur', done);
+      return el('span', { class: 'bmk' }, inp); }
+    return el('span', { class: 'bmk' + (B.acct === m.acct ? ' on' : '') },
+      el('button', { type: 'button', title: 'Open ' + m.acct, onclick: () => openAcct(m.acct) }, el('b', { text: '★ ' }), m.label || m.acct, m.label ? el('small', { text: m.acct }) : null),
+      el('button', { class: 'ic', type: 'button', title: 'Rename', 'aria-label': 'Rename bookmark ' + m.acct, text: '✎', onclick: () => { m.editing = true; renderBuilds(); const i = $('#bldMarks input'); if (i) { i.focus(); i.select(); } } }),
+      el('button', { class: 'ic', type: 'button', title: 'Remove bookmark', 'aria-label': 'Remove bookmark ' + m.acct, text: '✕', onclick: () => toggleMark(m.acct) }));
+  }
   function renderBuilds() {
-    $('#bldRecent').replaceChildren(...(B.recent.length ? [el('span', { class: 'dim', style: 'font-size:12px', text: 'Recent:' }), ...B.recent.map((a) => el('button', { class: 'pill', type: 'button', text: a, onclick: () => { $('#bldAcct').value = a; findChars(); } }))] : []));
-    const lg = M && M.league;
-    const list = (B.chars || []).filter((c) => $('#bldAll').checked || !lg || c.league === lg).sort((a, b) => b.level - a.level || (b.lastLoginTime || 0) - (a.lastLoginTime || 0));
-    if (B.chars && !list.length) $('#bldChars').replaceChildren(el('div', { class: 'empty', text: `No characters in ${lg}. Tick "Show all leagues" to see the others.` }));
-    else $('#bldChars').replaceChildren(...list.map((c) => el('button', { class: 'charc', type: 'button', 'aria-pressed': B.sel === c.name, onclick: () => loadChar(c.name) },
-      el('b', { text: c.name }), el('span', { text: `Level ${c.level} ${c.class}` + (c.league !== lg ? ' · ' + c.league : '') }))));
+    $('#bldMarks').replaceChildren(...(B.marks.length ? [el('span', { class: 'dim', style: 'font-size:12px', text: 'Bookmarks:' }), ...B.marks.map(markChip)] : []));
+    const rec = B.recent.filter((a) => !isMarked(a));
+    $('#bldRecent').replaceChildren(...(rec.length ? [el('span', { class: 'dim', style: 'font-size:12px', text: 'Recent:' }), ...rec.map((a) => el('button', { class: 'pill', type: 'button', text: a, onclick: () => openAcct(a) }))] : []));
+    const mk = $('#bldMark'); mk.hidden = !B.chars; if (B.chars) { const on = isMarked(B.acct); mk.textContent = on ? '★ Bookmarked' : '☆ Bookmark'; mk.setAttribute('aria-pressed', on); mk.title = on ? 'Remove ' + B.acct + ' from bookmarks' : 'Save ' + B.acct + ' to bookmarks'; }
+    // characters grouped by league: current league first, then most recently played
+    const lg = M && M.league, chars = B.chars || [];
+    const byL = d3.groups(chars, (c) => c.league).map(([name, cs]) => ({ name, cs: cs.sort((a, b) => b.level - a.level || (b.lastLoginTime || 0) - (a.lastLoginTime || 0)), last: d3.max(cs, (c) => c.lastLoginTime || 0) }))
+      .sort((a, b) => (b.name === lg) - (a.name === lg) || b.last - a.last);
+    if (B.chars && B.league === null) B.league = byL.some((x) => x.name === lg) ? lg : 'all';
+    $('#bldLeagues').replaceChildren(...(chars.length ? [el('span', { class: 'dim', style: 'font-size:12px', text: 'League:' }),
+      ...[{ name: 'all', cs: chars }, ...byL].map((x) => el('button', { class: 'pill', type: 'button', 'aria-pressed': B.league === x.name, onclick: () => { B.league = x.name; renderBuilds(); } },
+        (x.name === 'all' ? 'All' : x.name) + ' ', el('small', { class: 'dim', text: String(x.cs.length) })))] : []));
+    const card = (c) => el('button', { class: 'charc', type: 'button', 'aria-pressed': B.sel === c.name, onclick: () => loadChar(c.name) }, el('b', { text: c.name }), el('span', { text: `Level ${c.level} ${c.class}` }));
+    const shown = B.league === 'all' ? byL : byL.filter((x) => x.name === B.league);
+    if (B.chars && !chars.length) $('#bldChars').replaceChildren(el('div', { class: 'empty', text: 'This account has no characters, or they are hidden.' }));
+    else $('#bldChars').replaceChildren(...shown.flatMap((x) => [el('div', { class: 'lgh' }, x.name, el('small', { text: `${x.cs.length} character${x.cs.length > 1 ? 's' : ''}` + (x.name === lg ? ' · current league' : '') })), el('div', { class: 'chars' }, ...x.cs.map(card))]));
     if (B.data) renderChar($('#bldChar'), B.data);
   }
   // GGG sends mods either as plain strings or as {description: ...}
@@ -1438,7 +1472,8 @@ const PAGE_BUILD = '__BUILD__';
   }
   $('#bldGo').addEventListener('click', findChars);
   $('#bldAcct').addEventListener('keydown', (e) => { if (e.key === 'Enter') findChars(); });
-  $('#bldAll').addEventListener('change', renderBuilds);
+  $('#bldMark').addEventListener('click', () => { if (B.acct) toggleMark(B.acct); });
+  renderBuilds();
 
   // ---------------------------------------------------------------- chaos / divine switch
   function setUnit(v) { U = v; try { localStorage.setItem('em-unit', U); } catch (err) {} syncUnit(); if (!M) return; render(); if (drawerItem) openDrawer(drawerItem, true); }
