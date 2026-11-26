@@ -12,7 +12,12 @@ try:
     chars=json.loads(b); c=[x for x in chars if x.get("league")=="Covens"] or chars
     name=c[0]["name"]; print("first char", json.dumps(c[0])[:300])
     st,h,b=call("https://www.pathofexile.com/character-window/get-items", {"accountName":acct,"character":name,"realm":"pc"})
-    j=json.loads(b); print("ITEMS",st,len(b),"keys",list(j.keys()), "items",len(j.get("items",[])), json.dumps(j.get("items",[{}])[0])[:500])
+    print("ITEMS-RAW",st,len(b),b[:400])
+    st,h,b=call("https://www.pathofexile.com/character-window/get-items?"+urllib.parse.urlencode({"accountName":acct,"character":name,"realm":"pc"}))
+    print("ITEMS-GET",st,len(b),b[:400])
+    try:
+        j=json.loads(b); it=j.get("items") or []; print("ITEMS",len(it), json.dumps(it[0])[:700] if it else '', "char", json.dumps(j.get("character"))[:300])
+    except Exception as e: print("items parse",e)
     st,h,b=call("https://www.pathofexile.com/character-window/get-passive-skills?"+urllib.parse.urlencode({"accountName":acct,"character":name,"realm":"pc"}))
-    j=json.loads(b); print("PASSIVES",st,len(b),"keys",list(j.keys()), "hashes",len(j.get("hashes",[])))
+    print("PASSIVES",st,len(b),b[:200])
 except Exception as e: print("parse fail",e)
