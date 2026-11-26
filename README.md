@@ -16,6 +16,8 @@ Hourly trades come from GGG's own [currency exchange API](https://www.pathofexil
 
 The Builds tab imports a character from a **public** Path of Exile profile by account name (`Name#1234`) and prices its gear with the site's data. Browsers can't call pathofexile.com directly, so a small Cloudflare Worker (`worker/`, deployed by the `Deploy character import` workflow using the `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` repository secrets) reads the profile the same way Path of Building does. It never accepts cookies or session ids, only answers this site, and caches results for 2–5 minutes. These profile endpoints are not part of GGG's official API, so the feature can stop working if GGG changes or blocks them.
 
+The character page shows equipment laid out like the in-game inventory, skill groups, what the gear is worth, and the passive tree. The tree comes from GGG's official export ([grindinggear/skilltree-export](https://github.com/grindinggear/skilltree-export)), compacted by `scripts/tree.py` into `site/tree/tree.json`; re-run it when a patch changes the tree.
+
 ## Past leagues by the hour
 
 `scripts/pastfx.py` (workflow `Past leagues hourly`, twice a day) fetches GGG's hourly currency-exchange digests for each past league at the same age as the current league (3 days back to 4 days ahead), cleans them with the same misprint filter as the live data, and publishes them to the orphan `pastfx` branch. The deploy serves them at `data/pastfx/`; item details show them under Compare with past leagues → Hourly. Every chart on the site can be clicked to open a large view.

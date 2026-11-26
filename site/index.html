@@ -126,6 +126,43 @@ td.nm small{display:block;color:var(--dim);font-weight:400;font-size:11px}
 .skg h4{margin:0 0 6px;font-size:12px;color:var(--muted);font-weight:500}
 .skg .g{display:flex;justify-content:space-between;gap:8px}.skg .g.sup{color:var(--fg2);font-size:12px;padding-left:10px}
 .skg .g span{font-family:var(--mono);font-size:11px;color:var(--dim)}
+/* character page, laid out like poe.ninja */
+.cpage{display:grid;grid-template-columns:auto minmax(260px,1fr) minmax(280px,360px);gap:14px;align-items:start}
+@media (max-width:1100px){.cpage{grid-template-columns:auto 1fr}.cpage .val{grid-column:1/-1}}
+@media (max-width:720px){.cpage{grid-template-columns:1fr}}
+.chead{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;padding:4px 2px 2px}
+.chead h2{margin:0;font-size:22px}.chead .cls{color:var(--muted);font-size:13px}
+.chead .acts{margin-left:auto;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.doll{--c:44px;display:grid;grid-template-columns:repeat(8,var(--c));grid-template-rows:repeat(6,var(--c));gap:3px;grid-template-areas:
+ "w w . h h . o o" "w w . h h a o o" "w w . b b . o o" "w w r b b q o o" "g g . b b . f f" "g g . l l . f f"}
+@media (max-width:420px){.doll{--c:36px}}
+.slot{position:relative;background:radial-gradient(circle at 50% 40%,#1a1e25,#0c0e12 75%);border:1px solid #262b33;border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:default;min-width:0;min-height:0}
+.slot img{max-width:92%;max-height:92%;object-fit:contain;pointer-events:none}
+.slot.unique{border-color:#6b3d1a}.slot.rare{border-color:#6b6b2c}.slot.magic{border-color:#3b3b7a}.slot.empty{opacity:.35}
+.slot:hover,.slot:focus{border-color:var(--accent);outline:none}
+.slot .lk{position:absolute;right:2px;bottom:1px;font:600 10px var(--mono);color:#fff;text-shadow:0 0 3px #000}
+.slot .pc{position:absolute;left:2px;top:1px;font:600 10px var(--mono);color:var(--accent);text-shadow:0 0 3px #000}
+.flasks{display:flex;gap:3px;margin-top:8px}.flasks .slot{width:calc(var(--c,44px));height:calc(var(--c,44px)*2)}
+.wswap{margin-top:8px;font-size:12px}
+.jlist{display:flex;flex-wrap:wrap;gap:4px;margin-top:10px}.jlist .slot{width:40px;height:40px}
+.ftip{position:fixed;z-index:70;pointer-events:none;max-width:420px;filter:drop-shadow(0 8px 24px rgba(0,0,0,.6))}
+.skg .gi{width:22px;height:22px;object-fit:contain;flex:0 0 22px}
+.skg .g{align-items:center;gap:8px;padding:2px 0}.skg .g b{flex:1;min-width:0}
+.gS{color:#e06c6c}.gD{color:#7cd36b}.gI{color:#7aa6ff}.gG,.gW{color:#ddd}
+.vlist{display:flex;flex-direction:column;gap:2px;font-size:13px}
+.vlist .r{display:grid;grid-template-columns:22px 1fr auto auto auto;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid #1b1f26}
+.vlist .r img{width:22px;height:22px;object-fit:contain}
+.tree-wrap{display:grid;grid-template-columns:1fr minmax(220px,280px);gap:12px}
+@media (max-width:900px){.tree-wrap{grid-template-columns:1fr}}
+.tree{position:relative;height:560px;background:#07080a;border:1px solid var(--line);border-radius:8px;overflow:hidden;touch-action:none}
+.tree svg{width:100%;height:100%;cursor:grab}.tree svg:active{cursor:grabbing}
+.tree .tbar{position:absolute;top:8px;left:8px;display:flex;gap:6px;z-index:2}
+.tree .asc{position:absolute;right:8px;bottom:8px;width:200px;height:170px;background:rgba(10,12,15,.92);border:1px solid var(--line2);border-radius:8px;z-index:2}
+@media (max-width:600px){.tree .asc{width:130px;height:110px}.tree{height:440px}}
+.tree .asc span{position:absolute;top:4px;left:8px;font-size:11px;color:var(--muted)}
+.tside{max-height:560px;overflow:auto;font-size:13px;display:flex;flex-direction:column;gap:10px}
+.tside h4{margin:0 0 4px;font-size:12px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.04em}
+.tside .nd{padding:3px 0;cursor:default}.tside .nd b{font-weight:500}.tside .nd.k b{color:#e8c37a}.tside .nd small{display:block;color:var(--dim);font-size:11px;line-height:1.35}
 .zoomable{cursor:zoom-in}
 .zoomable::after{content:'⤢';position:absolute;top:-2px;right:0;font-size:13px;color:var(--dim);pointer-events:none}
 .zoomable:hover::after{color:var(--accent)}
@@ -1243,60 +1280,160 @@ const PAGE_BUILD = '__BUILD__';
     return el('div', { class: 'ptip ' + kind, style: r === 'rare' ? '--k:#ffff77' : r === 'magic' ? '--k:#8888ff' : '' },
       el('div', { class: 'hd' }, it.name ? el('div', { class: 'n', text: it.name }) : null, el('div', { class: it.name ? 'b' : 'n', text: it.typeLine })), bd);
   }
+  // floating tooltip for items (hover on desktop, tap on touch)
+  let ftip = null;
+  function showTip(e, node) { hideTip(); ftip = el('div', { class: 'ftip' }, node); document.body.append(ftip); moveTip(e); }
+  function moveTip(e) { if (!ftip) return; const w = ftip.offsetWidth, h = ftip.offsetHeight; let x = e.clientX + 16, y = e.clientY + 12;
+    if (x + w > innerWidth - 8) x = e.clientX - w - 16; if (y + h > innerHeight - 8) y = Math.max(8, innerHeight - h - 8); ftip.style.left = x + 'px'; ftip.style.top = y + 'px'; }
+  function hideTip() { if (ftip) { ftip.remove(); ftip = null; } }
+  const hoverTip = (node, make) => { node.addEventListener('mouseenter', (e) => showTip(e, make())); node.addEventListener('mousemove', moveTip); node.addEventListener('mouseleave', hideTip);
+    node.addEventListener('click', (e) => { if (ftip) hideTip(); else showTip(e, make()); }); node.tabIndex = 0;
+    node.addEventListener('focus', () => { const r = node.getBoundingClientRect(); showTip({ clientX: r.right, clientY: r.top }, make()); }); node.addEventListener('blur', hideTip); };
+
+  const AREA = { Weapon: 'w', Offhand: 'o', Helm: 'h', BodyArmour: 'b', Amulet: 'a', Ring: 'r', Ring2: 'q', Gloves: 'g', Boots: 'f', Belt: 'l' };
+  function slotBox(it, area, extra) {
+    const r2 = it ? rarity(it) : '', L = it ? linksOf(it) : 0, pr = it ? priceUnique(it) : null;
+    const box = el('div', { class: 'slot ' + (it ? r2 : 'empty'), style: area ? `grid-area:${area}` : extra || '', 'aria-label': it ? (it.name || it.typeLine) : 'empty slot' },
+      it && it.icon ? el('img', { src: it.icon, alt: '', loading: 'lazy' }) : null,
+      L >= 5 ? el('span', { class: 'lk', text: L + 'L' }) : null,
+      pr ? el('span', { class: 'pc', text: fmtP(pr.i.p).replace(' div', 'd') }) : null);
+    if (it) hoverTip(box, () => { const t = itemTip(it); if (pr) t.querySelector('.bd').append(el('div', { class: 'sep' }), el('div', { class: 'ft', style: 'color:var(--accent)', text: `Market: ${fmtP(pr.i.p)} · Call ${pr.i.sig}` })); return t; });
+    return box;
+  }
   function renderChar(host, d) {
-    const ch = d.character, gear = (d.items || []).concat(((d.passives || {}).items || []).map((x) => ({ ...x, inventoryId: 'PassiveJewels' })));
-    const r = divRate();
-    const rows = gear.filter((it) => SLOT[it.inventoryId]).sort((a, b) => SLOT_ORDER.indexOf(a.inventoryId) - SLOT_ORDER.indexOf(b.inventoryId) || (a.x || 0) - (b.x || 0));
-    const priced = rows.map((it) => ({ it, pr: priceUnique(it) }));
-    const uniq = priced.filter((x) => rarity(x.it) === 'unique'), got = uniq.filter((x) => x.pr);
+    hideTip();
+    const ch = d.character, items = d.items || [], jewels = ((d.passives || {}).items || []);
+    const bySlot = {}; items.forEach((it) => { (bySlot[it.inventoryId] = bySlot[it.inventoryId] || []).push(it); });
+    const r = divRate(), rDiv7 = (M.divine.f || [])[6] || r;
+    const all = items.concat(jewels).filter((it) => it.inventoryId !== 'MainInventory');
+    const uniq = all.filter((it) => rarity(it) === 'unique').map((it) => ({ it, pr: priceUnique(it) })), got = uniq.filter((x) => x.pr);
     const total = d3.sum(got, (x) => x.pr.i.p), fut = d3.sum(got, (x) => (x.pr.i.f || [])[6] ?? x.pr.i.p);
-    const rDiv7 = (M.divine.f || [])[6] || r;
-    const k = (label, value, sub, c) => el('div', { class: 'kpi' }, el('div', { class: 'k', text: label }), el('div', { class: 'v ' + (c || ''), text: value }), el('div', { class: 's', text: sub }));
-    const ch7 = total ? (fut / rDiv7) / (total / r) * 100 - 100 : null;
-    const wv = (c, rate) => U === 'c' ? d3.format(',.0f')(c) + 'c' : fmtWorthD(c / rate);
-    const kpis = el('section', { class: 'kpis' },
-      k('Gear value', got.length ? wv(total, r) : '—', `${got.length} of ${uniq.length} uniques priced`),
-      k('In 7 days · Call', got.length ? wv(fut, rDiv7) : '—', got.length ? pct(ch7) + ' in Divine terms' : 'No priced uniques', got.length ? cls(ch7) : ''),
-      k('Rares', String(priced.filter((x) => rarity(x.it) === 'rare').length), 'Not priced: every rare is different'),
-      k('Passives', String(((d.passives || {}).hashes || []).length), 'points allocated'));
-    // gear table
-    const tb = el('tbody');
-    priced.forEach(({ it, pr }) => {
-      const r2 = rarity(it), L = linksOf(it), key = it.id || it.inventoryId + it.x;
-      const mi = pr && pr.i, sc = mi ? (mi.sig === 'Gain' ? 'up' : mi.sig === 'Lose' ? 'dn' : 'mut') : '';
-      const trade = mi ? tradeLink(mi) : r2 === 'unique' ? tradeLink({ g: 'Uniques', n: it.name, un: it.name, b: it.baseType || it.typeLine, l: L >= 5 ? L : 0 }) : null;
-      const tr = el('tr', { class: B.open.has(key) ? 'open' : '', style: 'cursor:pointer', title: 'Show item' },
-        el('td', { class: 'mut', text: SLOT[it.inventoryId] }),
-        el('td', { class: 'nm' }, it.icon ? el('img', { class: 'ico', src: it.icon, alt: '', loading: 'lazy' }) : null,
-          el('b', { class: 'r-' + r2, text: it.name || it.typeLine }), it.name ? el('small', { text: it.typeLine }) : null),
-        el('td', { class: 'mono', text: L >= 2 ? L + 'L' : '' }),
-        el('td', { class: 'mono', title: mi ? altP(mi.p) + (pr.approx ? ' · several versions trade; cheapest shown' : '') : '' }, mi ? (pr.approx ? '≈ ' : '') + fmtP(mi.p) : el('span', { class: 'dim', title: 'The site only tracks uniques worth 5c or more with at least 10 listed. Use the trade link to check.', text: r2 === 'unique' ? 'cheap or rare · not tracked' : '—' })),
-        el('td', {}, mi ? el('span', { class: 'sig ' + sc, text: mi.sig }) : null),
-        el('td', {}, trade));
-      tr.addEventListener('click', (e) => { if (e.target.closest('a')) return; B.open.has(key) ? B.open.delete(key) : B.open.add(key); renderChar(host, d); });
-      tb.append(tr);
-      if (B.open.has(key)) tb.append(el('tr', {}, el('td', { colspan: 6, style: 'padding:12px' }, el('div', { style: 'max-width:520px;margin:0 auto' }, itemTip(it)))));
-    });
-    const gearTbl = el('div', { class: 'tblwrap' }, el('table', { class: 'gear' }, el('thead', {}, el('tr', {}, ...['Slot', 'Item', 'Links', 'Price', 'Call', 'Trade'].map((h) => el('th', { style: 'cursor:default', text: h })))), tb));
-    // skills: gems grouped by linked sockets
+    const ch7 = total ? (fut / rDiv7) / (total / r) * 100 - 100 : null, wv = (c, rate) => U === 'c' ? d3.format(',.0f')(c) + 'c' : fmtWorthD(c / rate);
+    // ---- equipment (paper doll)
+    const swap = !!B.swap;
+    const pick = (slot) => (bySlot[swap && slot === 'Weapon' ? 'Weapon2' : swap && slot === 'Offhand' ? 'Offhand2' : slot] || [])[0];
+    const doll = el('div', { class: 'doll' }, ...Object.entries(AREA).map(([slot, area]) => slotBox(pick(slot), area)));
+    const flasks = el('div', { class: 'flasks' }, ...[0, 1, 2, 3, 4].map((x) => slotBox((bySlot.Flask || []).find((f) => f.x === x), null)));
+    const hasSwap = bySlot.Weapon2 || bySlot.Offhand2;
+    const gearPanel = el('section', { class: 'panel' }, el('h3', { text: 'Equipment' }), el('p', { class: 'cap', text: 'Hover or tap an item to see it.' }), doll, flasks,
+      hasSwap ? el('button', { class: 'btn2 wswap', type: 'button', text: swap ? 'Show main weapons' : 'Show weapon swap', onclick: () => { B.swap = !swap; renderChar(host, d); } }) : null,
+      jewels.length ? el('div', {}, el('h3', { style: 'margin-top:14px', text: `Jewels (${jewels.length})` }), el('div', { class: 'jlist' }, ...jewels.map((j) => slotBox(j, null)))) : null);
+    // ---- skills (gem groups)
     const groups = [];
-    (d.items || []).forEach((it) => { if (!it.socketedItems || !it.socketedItems.length) return; const by = {};
+    items.forEach((it) => { if (!it.socketedItems || !it.socketedItems.length) return; const by = {};
       it.socketedItems.forEach((g) => { if (g.abyssJewel) return; const grp = ((it.sockets || [])[g.socket] || {}).group ?? 0; (by[grp] = by[grp] || []).push(g); });
       Object.values(by).forEach((gs) => groups.push({ slot: SLOT[it.inventoryId] || it.inventoryId, gems: gs.sort((a, b) => (a.support ? 1 : 0) - (b.support ? 1 : 0)) })); });
-    groups.sort((a, b) => b.gems.length - a.gems.length);
-    const skills = el('div', { class: 'skills' }, ...groups.map((g) => el('div', { class: 'skg' }, el('h4', { text: `${g.slot} · ${g.gems.length} linked` }),
-      ...g.gems.map((gm) => el('div', { class: 'g' + (gm.support ? ' sup' : '') }, el('b', { class: gm.support ? '' : 'r-gem', style: 'font-weight:' + (gm.support ? 400 : 600), text: gm.typeLine || gm.baseType }), el('span', { text: [prop(gm, 'Level') && 'lv ' + prop(gm, 'Level'), prop(gm, 'Quality') && 'q' + prop(gm, 'Quality')].filter(Boolean).join(' ') }))))));
-    const lgUrl = (ch.league || '').toLowerCase().replace(/\s+/g, '');
-    const ninja = ch.league === (M && M.league) ? ext(`https://poe.ninja/poe1/builds/${lgUrl}/character/${encodeURIComponent(B.acct.replace('#', '-'))}/${encodeURIComponent(ch.name)}`, 'View on poe.ninja ↗') : null;
-    const prof = ext(`https://www.pathofexile.com/account/view-profile/${encodeURIComponent(B.acct.replace('#', '-'))}/characters?characterName=${encodeURIComponent(ch.name)}`, 'PoE profile ↗');
+    groups.sort((a, b) => b.gems.length - a.gems.length || (b.gems.some((g) => !g.support) ? 1 : 0) - (a.gems.some((g) => !g.support) ? 1 : 0));
+    const gemRow = (gm) => { const row = el('div', { class: 'g' + (gm.support ? ' sup' : '') }, gm.icon ? el('img', { class: 'gi', src: gm.icon, alt: '', loading: 'lazy' }) : null,
+      el('b', { class: 'g' + (gm.colour || 'W'), style: 'font-weight:' + (gm.support ? 400 : 600), text: gm.typeLine || gm.baseType }),
+      el('span', { text: [prop(gm, 'Level') && prop(gm, 'Level'), prop(gm, 'Quality') && '/' + prop(gm, 'Quality')].filter(Boolean).join('') }));
+      hoverTip(row, () => itemTip({ ...gm, rarity: 'gem' })); return row; };
+    const skillsPanel = el('section', { class: 'panel' }, el('h3', { text: 'Skills' }), el('p', { class: 'cap', text: 'Linked gem groups, biggest first. Numbers are level / quality.' }),
+      groups.length ? el('div', { class: 'skills', style: 'grid-template-columns:1fr' }, ...groups.map((g) => el('div', { class: 'skg' }, el('h4', { text: `${g.slot} · ${g.gems.length}L` }), ...g.gems.map(gemRow))))
+        : el('div', { class: 'empty', text: 'No gems visible.' }));
+    // ---- value
+    const k = (label, value, sub, c) => el('div', { class: 'kpi' }, el('div', { class: 'k', text: label }), el('div', { class: 'v ' + (c || ''), text: value }), el('div', { class: 's', text: sub }));
+    const vrows = uniq.sort((a, b) => (b.pr ? b.pr.i.p : -1) - (a.pr ? a.pr.i.p : -1)).map(({ it, pr }) => { const mi = pr && pr.i, sc = mi ? (mi.sig === 'Gain' ? 'up' : mi.sig === 'Lose' ? 'dn' : 'mut') : '';
+      const trade = mi ? tradeLink(mi, '↗') : tradeLink({ g: 'Uniques', n: it.name, un: it.name, b: it.baseType || it.typeLine, l: linksOf(it) >= 5 ? linksOf(it) : 0 }, '↗');
+      const row = el('div', { class: 'r' }, it.icon ? el('img', { src: it.icon, alt: '' }) : el('span'), el('span', { class: 'r-unique', text: it.name }),
+        el('span', { class: 'mono', title: mi ? altP(mi.p) : 'The site only tracks uniques worth 5c+ with 10+ listed', text: mi ? (pr.approx ? '≈' : '') + fmtP(mi.p) : '—' }),
+        mi ? el('span', { class: 'sig ' + sc, text: mi.sig }) : el('span'), trade || el('span'));
+      hoverTip(row.firstChild, () => itemTip(it)); return row; });
     const trackBtn = got.length ? el('button', { class: 'btn2', type: 'button', text: `☆ Track ${got.length} unique${got.length > 1 ? 's' : ''}`, onclick: (e) => { got.forEach((x) => track(x.pr.i.n, (T.items.find((y) => y.n === x.pr.i.n) || {}).q || 1)); e.currentTarget.textContent = '★ Added to tracker'; updateBadge(); } }) : null;
-    const noItems = !(d.items || []).length;
-    host.replaceChildren(
-      el('div', { class: 'trk-head' }, el('div', {}, el('h2', { text: ch.name }), el('div', { class: 'note', text: `Level ${ch.level} ${ch.class} · ${ch.league}` })),
-        el('div', { class: 'acts', style: 'align-items:center;gap:12px' }, trackBtn, ninja, prof)),
-      noItems ? el('div', { class: 'empty', text: 'This character\'s gear is hidden. The player has turned off "Show characters\' items" in their privacy settings, or the character has nothing equipped.' }) : kpis,
-      noItems ? null : el('section', { class: 'panel' }, el('h3', { text: 'Gear' }), el('p', { class: 'cap', text: 'Click an item to see it. Uniques are priced from live market data; ≈ means several versions trade and the cheapest is shown.' }), gearTbl),
-      groups.length ? el('section', { class: 'panel' }, el('h3', { text: 'Skills' }), el('p', { class: 'cap', text: 'Gems grouped by linked sockets, biggest links first.' }), skills) : null);
+    const valPanel = el('section', { class: 'panel val' }, el('h3', { text: 'What the gear is worth' }),
+      el('div', { class: 'kpis', style: 'grid-template-columns:1fr 1fr;margin:8px 0 10px' },
+        k('Now', got.length ? wv(total, r) : '—', `${got.length} of ${uniq.length} uniques priced`),
+        k('In 7 days · Call', got.length ? wv(fut, rDiv7) : '—', got.length ? pct(ch7) + ' in Divine terms' : '', got.length ? cls(ch7) : '')),
+      el('div', { class: 'vlist' }, ...vrows), el('p', { class: 'cap', style: 'margin-top:8px', text: `${all.filter((it) => rarity(it) === 'rare').length} rares not priced (every rare is different). ↗ opens the official trade search.` }), trackBtn);
+    // ---- header
+    const lgUrl = (ch.league || '').toLowerCase().replace(/\s+/g, '');
+    const ninja = ch.league === (M && M.league) ? ext(`https://poe.ninja/poe1/builds/${lgUrl}/character/${encodeURIComponent(B.acct.replace('#', '-'))}/${encodeURIComponent(ch.name)}`, 'poe.ninja ↗') : null;
+    const prof = ext(`https://www.pathofexile.com/account/view-profile/${encodeURIComponent(B.acct.replace('#', '-'))}/characters?characterName=${encodeURIComponent(ch.name)}`, 'PoE profile ↗');
+    const head = el('div', { class: 'chead' }, el('div', {}, el('h2', { text: ch.name }), el('div', { class: 'cls', text: `Level ${ch.level} ${ch.class} · ${ch.league} · ${B.acct}` })), el('div', { class: 'acts' }, ninja, prof));
+    const treePanel = el('section', { class: 'panel' }, el('h3', { text: 'Passive tree' }), el('div', { class: 'empty', text: 'Loading the passive tree…' }));
+    const noItems = !items.length;
+    host.replaceChildren(head,
+      noItems ? el('div', { class: 'empty', text: 'This character\'s gear is hidden. The player has turned off "Show characters\' items" in their privacy settings, or nothing is equipped.' })
+        : el('div', { class: 'cpage' }, gearPanel, skillsPanel, valPanel),
+      treePanel);
+    if (d.passives) renderTree(treePanel, d);
+  }
+
+  // ---- passive tree (GGG's official export, compacted by scripts/tree.py into tree/tree.json)
+  let TREE;
+  async function loadTree() { if (TREE === undefined) { try { TREE = await fetch('tree/tree.json').then((r) => r.ok ? r.json() : null); } catch (e) { TREE = null; } } return TREE; }
+  async function renderTree(panel, d) {
+    const t = await loadTree(); const p = d.passives;
+    if (!t) { panel.replaceChildren(el('h3', { text: 'Passive tree' }), el('div', { class: 'empty', text: 'The passive tree could not be loaded.' })); return; }
+    const N = t.nodes, alloc = new Set((p.hashes || []).map(String).filter((h) => N[h]));
+    const ascCount = d3.rollup([...alloc].map((h) => N[h][6]).filter(Boolean), (v) => v.length, (x) => x);
+    const ascName = [...ascCount].sort((a, b) => b[1] - a[1]).map((x) => x[0])[0] || '';
+    const jewelAt = {}; ((p.items || [])).forEach((j) => { const sid = t.jewelSlots[j.x]; if (sid != null) jewelAt[String(sid)] = j; });
+    const startIdx = Object.keys(N).find((h) => N[h][5] === 5 && N[h][9] === p.character);
+    if (startIdx) alloc.add(startIdx);
+    const list = [...alloc].map((h) => [h, N[h]]);
+    const keys = list.filter(([, n]) => n[5] === 2), nots = list.filter(([, n]) => n[5] === 1 && !n[6]), asc = list.filter(([, n]) => n[6] && n[5] !== 6);
+    const blood = asc.filter(([, n]) => n[6] !== ascName && n[5] === 1);
+    const mast = Object.entries(p.mastery_effects || {}).map(([h, e]) => [h, N[h], ((N[h] || [])[9] || {})[String(e)] || []]).filter((x) => x[1]);
+    const side = el('div', { class: 'tside' });
+    const sec = (title, rows) => rows.length ? el('div', {}, el('h4', { text: title }), ...rows) : null;
+    const nodeRow = (n, stats, isKey) => el('div', { class: 'nd' + (isKey ? ' k' : '') }, el('b', { text: n[7] }), el('small', { text: stats.map(cleanStat).join(' · ') }));
+    side.append(...[sec('Keystones', keys.map(([, n]) => nodeRow(n, n[8], true))), sec((ascName ? ch_asc(d) : 'Ascendancy'), asc.filter(([, n]) => n[5] === 1 && n[6] === ascName).map(([, n]) => nodeRow(n, n[8], true))),
+      sec('Bloodline', blood.map(([, n]) => nodeRow(n, n[8], true))), sec('Masteries', mast.map(([, n, st]) => nodeRow(n, st))), sec(`Notables (${nots.length})`, nots.sort((a, b) => a[1][7].localeCompare(b[1][7])).map(([, n]) => nodeRow(n, n[8])))].filter(Boolean));
+    const box = el('div', { class: 'tree' }), bar = el('div', { class: 'tbar' });
+    const ascBox = ascName ? el('div', { class: 'asc' }, el('span', { text: ch_asc(d) })) : null;
+    box.append(bar); if (ascBox) box.append(ascBox);
+    const exN = (p.hashes_ex || []).length;
+    panel.replaceChildren(el('h3', { text: 'Passive tree' }),
+      el('p', { class: 'cap', text: `${[...alloc].filter((h) => !N[h][6] && N[h][5] !== 5).length} points on the tree${asc.length ? `, ${asc.length} ascendancy` : ''}${exN ? `, plus ${exN} from cluster jewels (not drawn)` : ''}. Drag to move, scroll or pinch to zoom, hover a node for details.` }),
+      el('div', { class: 'tree-wrap' }, box, side));
+    requestAnimationFrame(() => { const ctl = drawTree(box, t, alloc, jewelAt, '', p); if (ascBox) drawTree(ascBox, t, alloc, jewelAt, ascName, p, true);
+      bar.append(el('button', { class: 'btn2', type: 'button', text: 'Fit build', onclick: () => ctl.fit(true) }), el('button', { class: 'btn2', type: 'button', text: 'Whole tree', onclick: () => ctl.fit(false) }),
+        el('button', { class: 'btn2', type: 'button', text: '⤢ Full screen', onclick: () => openZoom({ title: `${d.character.name} · passive tree`, draw: (h2, H2) => { h2.style.height = H2 + 'px'; h2.classList.add('tree'); drawTree(h2, t, alloc, jewelAt, '', p).fit(true); } }) })); ctl.fit(true); });
+  }
+  const ch_asc = (d) => d.character.class;
+  const cleanStat = (x) => String(x).replace(/\[([^\]|]*\|)?([^\]]*)\]/g, '$2');
+  function drawTree(host, t, alloc, jewelAt, asc, p, mini) {
+    const N = t.nodes, R = t.orbitRadii, G = t.groups;
+    const ids = Object.keys(N).filter((h) => (N[h][6] || '') === asc && !(asc === '' && N[h][5] === 6));
+    const idset = new Set(ids);
+    const W = host.clientWidth || 600, H = host.clientHeight || 400;
+    const svg = d3.select(host).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', asc ? 'Ascendancy tree' : 'Passive tree');
+    const g = svg.append('g');
+    const on = (h) => alloc.has(h);
+    const edgePath = (a, b) => { const A = N[a], Bn = N[b];
+      if (A[2] === Bn[2] && A[3] === Bn[3] && A[3] > 0) { const r = R[A[3]]; let da = (Bn[4] - A[4] + 360) % 360;
+        return da <= 180 ? `M${A[0]},${A[1]}A${r},${r} 0 0 1 ${Bn[0]},${Bn[1]}` : `M${Bn[0]},${Bn[1]}A${r},${r} 0 0 1 ${A[0]},${A[1]}`; }
+      return `M${A[0]},${A[1]}L${Bn[0]},${Bn[1]}`; };
+    const E = t.edges.map(([a, b]) => [String(a), String(b)]).filter(([a, b]) => idset.has(a) && idset.has(b));
+    g.append('g').selectAll('path').data(E.filter(([a, b]) => !(on(a) && on(b)))).join('path').attr('d', ([a, b]) => edgePath(a, b)).attr('fill', 'none').attr('stroke', '#2a2f37').attr('stroke-width', mini ? 6 : 10);
+    g.append('g').selectAll('path').data(E.filter(([a, b]) => on(a) && on(b))).join('path').attr('d', ([a, b]) => edgePath(a, b)).attr('fill', 'none').attr('stroke', '#c9963a').attr('stroke-width', mini ? 12 : 18);
+    const RAD = [16, 30, 46, 22, 28, 60, 30];
+    const nodes = g.append('g').selectAll('g').data(ids).join('g').attr('transform', (h) => `translate(${N[h][0]},${N[h][1]})`);
+    nodes.each(function (h) { const n = N[h], sel = d3.select(this), a = on(h), kind = n[5], r = RAD[kind];
+      const fill = a ? (kind === 2 ? '#f0c36a' : kind === 1 ? '#e3a64a' : kind === 3 ? '#8a6bd1' : '#c9963a') : (kind === 3 ? '#1c1a26' : '#14171c');
+      const stroke = a ? '#ffe2a6' : kind === 2 ? '#6b5a35' : kind === 1 ? '#4a4030' : '#333a44';
+      if (kind === 4) sel.append('rect').attr('x', -r).attr('y', -r).attr('width', 2 * r).attr('height', 2 * r).attr('transform', 'rotate(45)').attr('fill', jewelAt[h] ? '#3f7fd8' : fill).attr('stroke', jewelAt[h] ? '#a9c9ff' : stroke).attr('stroke-width', 6);
+      else if (kind === 3) sel.append('circle').attr('r', r).attr('fill', fill).attr('stroke', a ? '#cbb6ff' : '#2b2838').attr('stroke-width', 5);
+      else sel.append('circle').attr('r', r).attr('fill', fill).attr('stroke', stroke).attr('stroke-width', kind === 0 ? 5 : 8); });
+    const tip = d3.select(host).append('div').attr('class', 'tip').style('display', 'none').style('max-width', '320px').style('pointer-events', 'none');
+    nodes.on('pointerenter', (ev, h) => { const n = N[h]; tip.style('display', null).selectAll('*').remove();
+        const j = jewelAt[h]; tip.append('div').style('font-weight', 600).style('color', on(h) ? 'var(--accent)' : 'var(--fg)').text(j ? (j.name || j.typeLine) : n[7] || 'Passive');
+        let stats = n[8] || []; if (n[5] === 3 && p.mastery_effects && p.mastery_effects[h] != null) stats = (n[9] || {})[String(p.mastery_effects[h])] || stats;
+        if (j) stats = [].concat(j.explicitMods || []).map(modText);
+        stats.slice(0, 8).forEach((s2) => tip.append('div').attr('class', 'mut').text(cleanStat(s2)));
+        if (!on(h)) tip.append('div').attr('class', 'dim').style('font-size', '11px').text('not allocated'); })
+      .on('pointermove', (ev) => { const [x, y] = d3.pointer(ev, host); const tw = tip.node().offsetWidth; tip.style('left', Math.min(host.clientWidth - tw - 4, x + 14) + 'px').style('top', (y + 14) + 'px'); })
+      .on('pointerleave', () => tip.style('display', 'none'));
+    const zoom = d3.zoom().scaleExtent([0.01, 2]).on('zoom', (ev) => g.attr('transform', ev.transform));
+    svg.call(zoom);
+    const fit = (build) => { const pts = (build ? ids.filter(on) : ids).map((h) => N[h]); if (!pts.length) return;
+      const [x0, x1] = d3.extent(pts, (q) => q[0]), [y0, y1] = d3.extent(pts, (q) => q[1]); const pad = mini ? 120 : 400;
+      const k = Math.min(W / (x1 - x0 + 2 * pad), H / (y1 - y0 + 2 * pad));
+      const tr = d3.zoomIdentity.translate(W / 2 - k * (x0 + x1) / 2, H / 2 - k * (y0 + y1) / 2).scale(k);
+      svg.transition().duration(mini ? 0 : 450).call(zoom.transform, tr); };
+    if (mini) { svg.on('.zoom', null); fit(false); }
+    return { fit };
   }
   $('#bldGo').addEventListener('click', findChars);
   $('#bldAcct').addEventListener('keydown', (e) => { if (e.key === 'Enter') findChars(); });
