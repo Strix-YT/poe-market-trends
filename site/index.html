@@ -109,6 +109,23 @@ td.nm small{display:block;color:var(--dim);font-weight:400;font-size:11px}
 .stat{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px}
 .stat .k{font-size:11px;color:var(--muted)}.stat .v{font-family:var(--mono);font-size:16px;margin-top:3px}.stat .v.t{font-family:var(--sans);font-size:14px;font-weight:600}
 .x{position:absolute;top:14px;right:14px}
+/* builds */
+.bld{padding:18px 22px 40px;display:flex;flex-direction:column;gap:16px}
+.bld .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+#bldAcct{flex:0 1 300px;min-width:200px}
+.chars{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+.charc{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;text-align:left;color:var(--fg);cursor:pointer;font:inherit}
+.charc:hover,.charc[aria-pressed=true]{border-color:var(--accent)}
+.charc b{display:block;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.charc span{font-size:12px;color:var(--muted)}
+.gear td{vertical-align:middle}.gear .ico{width:30px;height:30px}
+.r-unique{color:#af6025}.r-rare{color:#ffff77}.r-magic{color:#8888ff}.r-normal{color:#c8c8c8}.r-gem{color:#1ba29b}.r-relic{color:#82ad6a}
+.gear .nm b{font-weight:500}.gear .nm small{display:block;color:var(--dim);font-size:11px}
+.gear tr.open+tr td{background:#0b0d10}
+.skills{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}
+.skg{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:13px}
+.skg h4{margin:0 0 6px;font-size:12px;color:var(--muted);font-weight:500}
+.skg .g{display:flex;justify-content:space-between;gap:8px}.skg .g.sup{color:var(--fg2);font-size:12px;padding-left:10px}
+.skg .g span{font-family:var(--mono);font-size:11px;color:var(--dim)}
 .zoomable{cursor:zoom-in}
 .zoomable::after{content:'⤢';position:absolute;top:-2px;right:0;font-size:13px;color:var(--dim);pointer-events:none}
 .zoomable:hover::after{color:var(--accent)}
@@ -198,6 +215,7 @@ td.nm .ico{margin-top:-2px}
   <nav class="tabs" aria-label="Views">
     <a href="#market" data-view="market">Market</a>
     <a href="#tracker" data-view="tracker">Tracker <span class="badge" id="trkBadge" hidden></span></a>
+    <a href="#builds" data-view="builds">Builds</a>
   </nav>
   <div class="ticker" id="ticker"><span class="skel">Loading prices…</span></div>
   <div class="topR">
@@ -299,6 +317,22 @@ td.nm .ico{margin-top:-2px}
     <div class="more"><button class="btn2" type="button" id="moreBtn" hidden>Show more</button></div>
 
   </main>
+</div>
+
+<div class="bld" id="viewBuilds" hidden>
+  <div class="trk-head">
+    <div><h2>Builds</h2><div class="note">Import a character from a public Path of Exile profile and see what its gear is worth today and next week.</div></div>
+  </div>
+  <div class="row">
+    <input id="bldAcct" class="inp" placeholder="Account name, e.g. Name#1234" autocomplete="off" aria-label="Path of Exile account name with #1234">
+    <button class="btn" type="button" id="bldGo">Find characters</button>
+    <label class="note" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="bldAll"> Show all leagues</label>
+    <span id="bldMsg" class="note" role="status"></span>
+  </div>
+  <div class="row" id="bldRecent"></div>
+  <div class="chars" id="bldChars"></div>
+  <div id="bldChar"></div>
+  <p class="note">Works with public profiles only (pathofexile.com → My Account → Privacy). The account name is case-sensitive and includes the #1234 tag. Gear prices are for uniques; rares and gems are not priced.</p>
 </div>
 
 <div class="trk" id="viewTracker" hidden>
@@ -904,7 +938,7 @@ const PAGE_BUILD = '__BUILD__';
   const track = (n, q = 0) => { if (!isTracked(n)) { T.items.push({ n, q, hi: '', lo: '' }); tsave(); } };
   const untrack = (n) => { T.items = T.items.filter((x) => x.n !== n); tsave(); };
   const QUICK = ['Divine Orb', 'Chaos Orb', 'Mirror of Kalandra', 'Mirror Shard', 'Exalted Orb', "Hinekora's Lock", 'Orb of Annulment', 'Fracturing Orb', 'Orb of Alchemy', 'Vaal Orb'];
-  const view = () => location.hash === '#tracker' ? 'tracker' : 'market';
+  const view = () => location.hash === '#tracker' ? 'tracker' : location.hash === '#builds' ? 'builds' : 'market';
 
   const pctTo = (a, b) => a && b ? (b / a - 1) * 100 : null;
   const callOf = (f7) => f7 == null ? 'New' : f7 > 10 ? 'Gain' : f7 < -10 ? 'Lose' : 'Hold';
@@ -1131,13 +1165,140 @@ const PAGE_BUILD = '__BUILD__';
     clearTimeout(clearArm); clearArm = null; b.textContent = 'Clear all'; T.items = []; tsave(); renderTracker(); renderTable(); updateBadge(); });
 
   function setView() {
-    const v = view(); $('#viewMarket').hidden = v !== 'market'; $('#viewTracker').hidden = v !== 'tracker';
+    const v = view(); $('#viewMarket').hidden = v !== 'market'; $('#viewTracker').hidden = v !== 'tracker'; $('#viewBuilds').hidden = v !== 'builds';
     $$('.tabs a').forEach((a) => { if (a.dataset.view === v) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
-    document.title = (v === 'tracker' ? 'My tracker · ' : '') + 'Exile Market · PoE price terminal';
-    if (M) { if (v === 'tracker') renderTracker(); else { renderTable(); drawDivine(); } }
+    document.title = (v === 'tracker' ? 'My tracker · ' : v === 'builds' ? 'Builds · ' : '') + 'Exile Market · PoE price terminal';
+    if (M) { if (v === 'tracker') renderTracker(); else if (v === 'builds') renderBuilds(); else { renderTable(); drawDivine(); } }
   }
   window.addEventListener('hashchange', setView);
   setView();
+
+  // ---------------------------------------------------------------- builds: import a public character
+  // The import server (worker/index.js, a Cloudflare Worker) reads public profiles the way Path of Building does.
+  const IMPORT_API = '';
+  const B = { acct: '', chars: null, sel: null, data: null, open: new Set() };
+  try { const s0 = JSON.parse(localStorage.getItem('em-builds') || 'null'); if (s0) { B.recent = s0.recent || []; } } catch (e) {} B.recent = B.recent || [];
+  const bsave = () => { try { localStorage.setItem('em-builds', JSON.stringify({ recent: B.recent.slice(0, 6) })); } catch (e) {} };
+  async function api(path, params) {
+    if (!IMPORT_API) throw new Error('Character import is still being set up. It will be available shortly.');
+    const r = await fetch(IMPORT_API + path + '?' + new URLSearchParams(params));
+    let j = null; try { j = await r.json(); } catch (e) {}
+    if (!r.ok) throw new Error((j && j.message) || 'Import failed (' + r.status + ').');
+    return j;
+  }
+  const RAR = { 0: 'normal', 1: 'magic', 2: 'rare', 3: 'unique', 4: 'gem', 9: 'relic', 10: 'unique' };
+  const rarity = (it) => (it.rarity || RAR[it.frameType] || 'normal').toLowerCase();
+  const SLOT = { Weapon: 'Weapon', Offhand: 'Off-hand', Weapon2: 'Weapon (swap)', Offhand2: 'Off-hand (swap)', Helm: 'Helmet', BodyArmour: 'Body armour', Gloves: 'Gloves', Boots: 'Boots', Amulet: 'Amulet', Ring: 'Ring', Ring2: 'Ring', Ring3: 'Ring', Belt: 'Belt', Flask: 'Flask', Trinket: 'Trinket', PassiveJewels: 'Jewel' };
+  const SLOT_ORDER = ['Weapon', 'Offhand', 'Helm', 'BodyArmour', 'Gloves', 'Boots', 'Amulet', 'Ring', 'Ring2', 'Ring3', 'Belt', 'Flask', 'Trinket', 'PassiveJewels', 'Weapon2', 'Offhand2'];
+  const linksOf = (it) => { const g = {}; (it.sockets || []).forEach((so) => { g[so.group] = (g[so.group] || 0) + 1; }); return Math.max(0, ...Object.values(g)); };
+  // price a worn unique from market.json: same unique name, prefer the matching link count
+  function priceUnique(it) {
+    if (rarity(it) !== 'unique' || !M) return null;
+    const name = it.name || it.typeLine, L = linksOf(it);
+    const c = M.items.filter((i) => i.g === 'Uniques' && (i.un || i.n) === name);
+    if (!c.length) return null;
+    const byL = c.filter((i) => (i.l || 0) === (L >= 5 ? L : 0));
+    const pool = byL.length ? byL : c.filter((i) => !i.l).length ? c.filter((i) => !i.l) : c;
+    const pick = pool.slice().sort((a, b) => a.p - b.p)[0];
+    return { i: pick, approx: pool.length > 1 };
+  }
+  const prop = (it, n) => { const p = (it.properties || []).find((x) => x.name === n); return p && p.values && p.values[0] ? String(p.values[0][0]).replace(/[^\d]/g, '') : ''; };
+
+  async function findChars() {
+    const acct = $('#bldAcct').value.trim().replace(/\s+/g, ''), msg = $('#bldMsg');
+    if (!/^[^#]{2,40}#\d{4}$/.test(acct)) { msg.textContent = 'Enter the account name with its #1234 tag, e.g. Name#1234.'; return; }
+    msg.textContent = 'Looking up ' + acct + '…'; $('#bldChars').replaceChildren(); $('#bldChar').replaceChildren(); B.sel = null;
+    try { B.chars = await api('/characters', { account: acct }); B.acct = acct;
+      B.recent = [acct, ...B.recent.filter((a) => a.toLowerCase() !== acct.toLowerCase())]; bsave();
+      msg.textContent = ''; renderBuilds();
+    } catch (e) { B.chars = null; msg.textContent = e.message; }
+  }
+  async function loadChar(name) {
+    B.sel = name; B.data = null; B.open.clear(); renderBuilds();
+    const host = $('#bldChar'); host.replaceChildren(el('div', { class: 'empty', text: 'Importing ' + name + '…' }));
+    try { B.data = await api('/character', { account: B.acct, name }); renderBuilds(); host.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    catch (e) { host.replaceChildren(el('div', { class: 'empty', text: e.message })); }
+  }
+  function renderBuilds() {
+    $('#bldRecent').replaceChildren(...(B.recent.length ? [el('span', { class: 'dim', style: 'font-size:12px', text: 'Recent:' }), ...B.recent.map((a) => el('button', { class: 'pill', type: 'button', text: a, onclick: () => { $('#bldAcct').value = a; findChars(); } }))] : []));
+    const lg = M && M.league;
+    const list = (B.chars || []).filter((c) => $('#bldAll').checked || !lg || c.league === lg).sort((a, b) => b.level - a.level || (b.lastLoginTime || 0) - (a.lastLoginTime || 0));
+    if (B.chars && !list.length) $('#bldChars').replaceChildren(el('div', { class: 'empty', text: `No characters in ${lg}. Tick "Show all leagues" to see the others.` }));
+    else $('#bldChars').replaceChildren(...list.map((c) => el('button', { class: 'charc', type: 'button', 'aria-pressed': B.sel === c.name, onclick: () => loadChar(c.name) },
+      el('b', { text: c.name }), el('span', { text: `Level ${c.level} ${c.class}` + (c.league !== lg ? ' · ' + c.league : '') }))));
+    if (B.data) renderChar($('#bldChar'), B.data);
+  }
+  function itemTip(it) {
+    const r = rarity(it), kind = r === 'unique' ? 'u' : r === 'gem' ? 'card' : 'cur';
+    const parts = [];
+    const props = (it.properties || []).filter((p) => p.values && p.values.length).map((p) => el('div', { class: 'pr' }, p.name.replace(/\{\d\}/g, '') + ': ', el('b', { text: p.values.map((v) => v[0]).join(', ') })));
+    if (props.length) parts.push(props);
+    if (it.requirements && it.requirements.length) parts.push([el('div', { class: 'pr' }, 'Requires ', ...it.requirements.flatMap((q, k) => [k ? ', ' : '', q.name + ' ', el('b', { text: q.values[0][0] })]))]);
+    [['enchantMods', 'md'], ['implicitMods', 'md'], ['fracturedMods', 'md'], ['explicitMods', 'md'], ['craftedMods', 'md']].forEach(([k, c]) => { if (it[k] && it[k].length) parts.push(it[k].map((t) => el('div', { class: c, style: k === 'craftedMods' ? 'color:#b4b4ff' : k === 'fracturedMods' ? 'color:#a29162' : '', text: t }))); });
+    if (it.corrupted) parts.push([el('div', { style: 'color:#d20000', text: 'Corrupted' })]);
+    if (it.flavourText && it.flavourText.length) parts.push([el('div', { class: 'fl', text: it.flavourText.join('').replace(/\r/g, '') })]);
+    const bd = el('div', { class: 'bd' }); parts.forEach((g, k) => { if (k) bd.append(el('div', { class: 'sep' })); bd.append(...g); });
+    return el('div', { class: 'ptip ' + kind, style: r === 'rare' ? '--k:#ffff77' : r === 'magic' ? '--k:#8888ff' : '' },
+      el('div', { class: 'hd' }, it.name ? el('div', { class: 'n', text: it.name }) : null, el('div', { class: it.name ? 'b' : 'n', text: it.typeLine })), bd);
+  }
+  function renderChar(host, d) {
+    const ch = d.character, gear = (d.items || []).concat(((d.passives || {}).items || []).map((x) => ({ ...x, inventoryId: 'PassiveJewels' })));
+    const r = divRate();
+    const rows = gear.filter((it) => SLOT[it.inventoryId]).sort((a, b) => SLOT_ORDER.indexOf(a.inventoryId) - SLOT_ORDER.indexOf(b.inventoryId) || (a.x || 0) - (b.x || 0));
+    const priced = rows.map((it) => ({ it, pr: priceUnique(it) }));
+    const uniq = priced.filter((x) => rarity(x.it) === 'unique'), got = uniq.filter((x) => x.pr);
+    const total = d3.sum(got, (x) => x.pr.i.p), fut = d3.sum(got, (x) => (x.pr.i.f || [])[6] ?? x.pr.i.p);
+    const rDiv7 = (M.divine.f || [])[6] || r;
+    const k = (label, value, sub, c) => el('div', { class: 'kpi' }, el('div', { class: 'k', text: label }), el('div', { class: 'v ' + (c || ''), text: value }), el('div', { class: 's', text: sub }));
+    const ch7 = total ? (fut / rDiv7) / (total / r) * 100 - 100 : null;
+    const wv = (c, rate) => U === 'c' ? d3.format(',.0f')(c) + 'c' : fmtWorthD(c / rate);
+    const kpis = el('section', { class: 'kpis' },
+      k('Gear value', got.length ? wv(total, r) : '—', `${got.length} of ${uniq.length} uniques priced`),
+      k('In 7 days · Call', got.length ? wv(fut, rDiv7) : '—', got.length ? pct(ch7) + ' in Divine terms' : 'No priced uniques', got.length ? cls(ch7) : ''),
+      k('Rares', String(priced.filter((x) => rarity(x.it) === 'rare').length), 'Not priced: every rare is different'),
+      k('Passives', String(((d.passives || {}).hashes || []).length), 'points allocated'));
+    // gear table
+    const tb = el('tbody');
+    priced.forEach(({ it, pr }) => {
+      const r2 = rarity(it), L = linksOf(it), key = it.id || it.inventoryId + it.x;
+      const mi = pr && pr.i, sc = mi ? (mi.sig === 'Gain' ? 'up' : mi.sig === 'Lose' ? 'dn' : 'mut') : '';
+      const trade = mi ? tradeLink(mi) : r2 === 'unique' ? tradeLink({ g: 'Uniques', n: it.name, un: it.name, b: it.baseType || it.typeLine, l: L >= 5 ? L : 0 }) : null;
+      const tr = el('tr', { class: B.open.has(key) ? 'open' : '', style: 'cursor:pointer', title: 'Show item' },
+        el('td', { class: 'mut', text: SLOT[it.inventoryId] }),
+        el('td', { class: 'nm' }, it.icon ? el('img', { class: 'ico', src: it.icon, alt: '', loading: 'lazy' }) : null,
+          el('b', { class: 'r-' + r2, text: it.name || it.typeLine }), it.name ? el('small', { text: it.typeLine }) : null),
+        el('td', { class: 'mono', text: L >= 2 ? L + 'L' : '' }),
+        el('td', { class: 'mono', title: mi ? altP(mi.p) + (pr.approx ? ' · several versions trade; cheapest shown' : '') : '' }, mi ? (pr.approx ? '≈ ' : '') + fmtP(mi.p) : el('span', { class: 'dim', text: r2 === 'unique' ? 'not on market' : '—' })),
+        el('td', {}, mi ? el('span', { class: 'sig ' + sc, text: mi.sig }) : null),
+        el('td', {}, trade));
+      tr.addEventListener('click', (e) => { if (e.target.closest('a')) return; B.open.has(key) ? B.open.delete(key) : B.open.add(key); renderChar(host, d); });
+      tb.append(tr);
+      if (B.open.has(key)) tb.append(el('tr', {}, el('td', { colspan: 6, style: 'padding:12px' }, el('div', { style: 'max-width:520px;margin:0 auto' }, itemTip(it)))));
+    });
+    const gearTbl = el('div', { class: 'tblwrap' }, el('table', { class: 'gear' }, el('thead', {}, el('tr', {}, ...['Slot', 'Item', 'Links', 'Price', 'Call', 'Trade'].map((h) => el('th', { style: 'cursor:default', text: h })))), tb));
+    // skills: gems grouped by linked sockets
+    const groups = [];
+    (d.items || []).forEach((it) => { if (!it.socketedItems || !it.socketedItems.length) return; const by = {};
+      it.socketedItems.forEach((g) => { if (g.abyssJewel) return; const grp = ((it.sockets || [])[g.socket] || {}).group ?? 0; (by[grp] = by[grp] || []).push(g); });
+      Object.values(by).forEach((gs) => groups.push({ slot: SLOT[it.inventoryId] || it.inventoryId, gems: gs.sort((a, b) => (a.support ? 1 : 0) - (b.support ? 1 : 0)) })); });
+    groups.sort((a, b) => b.gems.length - a.gems.length);
+    const skills = el('div', { class: 'skills' }, ...groups.map((g) => el('div', { class: 'skg' }, el('h4', { text: `${g.slot} · ${g.gems.length} linked` }),
+      ...g.gems.map((gm) => el('div', { class: 'g' + (gm.support ? ' sup' : '') }, el('b', { class: gm.support ? '' : 'r-gem', style: 'font-weight:' + (gm.support ? 400 : 600), text: gm.typeLine || gm.baseType }), el('span', { text: [prop(gm, 'Level') && 'lv ' + prop(gm, 'Level'), prop(gm, 'Quality') && 'q' + prop(gm, 'Quality')].filter(Boolean).join(' ') }))))));
+    const lgUrl = (ch.league || '').toLowerCase().replace(/\s+/g, '');
+    const ninja = ch.league === (M && M.league) ? ext(`https://poe.ninja/poe1/builds/${lgUrl}/character/${encodeURIComponent(B.acct.replace('#', '-'))}/${encodeURIComponent(ch.name)}`, 'View on poe.ninja ↗') : null;
+    const prof = ext(`https://www.pathofexile.com/account/view-profile/${encodeURIComponent(B.acct.replace('#', '-'))}/characters?characterName=${encodeURIComponent(ch.name)}`, 'PoE profile ↗');
+    const trackBtn = got.length ? el('button', { class: 'btn2', type: 'button', text: `☆ Track ${got.length} unique${got.length > 1 ? 's' : ''}`, onclick: (e) => { got.forEach((x) => track(x.pr.i.n, (T.items.find((y) => y.n === x.pr.i.n) || {}).q || 1)); e.currentTarget.textContent = '★ Added to tracker'; updateBadge(); } }) : null;
+    const noItems = !(d.items || []).length;
+    host.replaceChildren(
+      el('div', { class: 'trk-head' }, el('div', {}, el('h2', { text: ch.name }), el('div', { class: 'note', text: `Level ${ch.level} ${ch.class} · ${ch.league}` })),
+        el('div', { class: 'acts', style: 'align-items:center;gap:12px' }, trackBtn, ninja, prof)),
+      noItems ? el('div', { class: 'empty', text: 'This character\'s gear is hidden. The player has turned off "Show characters\' items" in their privacy settings, or the character has nothing equipped.' }) : kpis,
+      noItems ? null : el('section', { class: 'panel' }, el('h3', { text: 'Gear' }), el('p', { class: 'cap', text: 'Click an item to see it. Uniques are priced from live market data; ≈ means several versions trade and the cheapest is shown.' }), gearTbl),
+      groups.length ? el('section', { class: 'panel' }, el('h3', { text: 'Skills' }), el('p', { class: 'cap', text: 'Gems grouped by linked sockets, biggest links first.' }), skills) : null);
+  }
+  $('#bldGo').addEventListener('click', findChars);
+  $('#bldAcct').addEventListener('keydown', (e) => { if (e.key === 'Enter') findChars(); });
+  $('#bldAll').addEventListener('change', renderBuilds);
 
   // ---------------------------------------------------------------- chaos / divine switch
   function setUnit(v) { U = v; try { localStorage.setItem('em-unit', U); } catch (err) {} syncUnit(); if (!M) return; render(); if (drawerItem) openDrawer(drawerItem, true); }
