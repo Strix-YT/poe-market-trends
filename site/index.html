@@ -23,10 +23,15 @@ button,input,select{font:inherit;color:inherit}
 .top{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px;padding:10px 20px;border-bottom:1px solid var(--line);background:var(--bg2)}
 .brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.02em}
 .chip{font-family:var(--mono);font-size:12px;color:var(--muted);border:1px solid var(--line2);border-radius:4px;padding:2px 6px}
-.ticker{display:flex;gap:18px;font-family:var(--mono);font-size:13px;flex:1 1 380px;flex-wrap:wrap;min-width:0}
+.ticker{font-family:var(--mono);font-size:13px;flex:1 1 200px;min-width:0;overflow:hidden;white-space:nowrap;-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 16px,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(90deg,transparent 0,#000 16px,#000 calc(100% - 28px),transparent)}
+.ticker .tkin{display:inline-flex;gap:18px;padding:0 16px}
+.ticker.run .tkin{animation:tk var(--tkd,40s) linear infinite}.ticker.run:hover .tkin{animation-play-state:paused}
+@keyframes tk{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){.ticker{overflow-x:auto}.ticker.run .tkin{animation:none}}
 .ticker span{white-space:nowrap}
 .ticker b{color:var(--fg);font-weight:600}
-.topR{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted)}
+.topR{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted);flex-wrap:wrap}.topR .seg{flex-shrink:0}
+@media (max-width:600px){.top .ticker{flex-basis:100%;order:3}.topR{flex:1 1 auto;flex-wrap:nowrap;min-width:0}#stamp{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}}
 .btn{background:var(--accent);color:#0d0f12;border:0;border-radius:6px;padding:8px 14px;font-weight:600;min-height:36px;cursor:pointer}
 .btn:disabled{opacity:.6;cursor:default}
 .btn2{background:var(--panel2);color:var(--fg2);border:1px solid var(--line2);border-radius:6px;padding:7px 12px;cursor:pointer}
@@ -572,7 +577,10 @@ const PAGE_BUILD = '__BUILD__';
     const parts = [['DIVINE', cur, d.c24 ?? null]];
     ['Mirror of Kalandra', 'Exalted Orb', 'Mageblood [4 Flasks]', 'Headhunter'].forEach((n) => { const i = byN.get(n); if (i) parts.push([n.replace(' of Kalandra', '').replace(' [4 Flasks]', '').toUpperCase(), i.p, v24(i)]); });
     const hi = M.items.filter((i) => i.conf === 'High' && i.src === 'fx' && i.c1 != null).sort((a, b) => Math.abs(b.c1) - Math.abs(a.c1))[0];
-    const t = $('#ticker'); t.replaceChildren(...parts.map(([n, p, c]) => el('span', {}, n + ' ', el('b', { text: n === 'DIVINE' ? fmtC(p) + 'c' : fmtP(p) }), ' ', el('span', { class: cls(c), text: c == null ? '' : (c >= 0 ? '▲' : '▼') + pct(Math.abs(c)).replace('+', '') }))));
+    // one line; if it doesn't fit, it scrolls slowly (pauses on hover) instead of wrapping and growing the top bar
+    const mk = () => parts.map(([n, p, c]) => el('span', {}, n + ' ', el('b', { text: n === 'DIVINE' ? fmtC(p) + 'c' : fmtP(p) }), ' ', el('span', { class: cls(c), text: c == null ? '' : (c >= 0 ? '▲' : '▼') + pct(Math.abs(c)).replace('+', '') })));
+    const t = $('#ticker'), inner = el('div', { class: 'tkin' }, ...mk()); t.classList.remove('run'); t.replaceChildren(inner);
+    requestAnimationFrame(() => { if (inner.scrollWidth > t.clientWidth + 4) { const w = inner.scrollWidth; inner.append(...mk()); t.style.setProperty('--tkd', Math.max(20, w / 40) + 's'); t.classList.add('run'); } });
     if (hi) t.append(el('span', {}, '1H MOVER ', el('b', { text: hi.n }), ' ', el('span', { class: cls(hi.c1), text: pct(hi.c1) })));
     const g = new Date(M.generatedAt); const mins = Math.round((Date.now() - g) / 60000);
     $('#stamp').textContent = `Updated ${d3.utcFormat('%H:%M')(g)} UTC (${mins < 60 ? mins + ' min' : Math.round(mins / 60) + 'h'} ago)`;
@@ -1491,7 +1499,7 @@ const PAGE_BUILD = '__BUILD__';
     } catch (err) { msg.textContent = 'Could not load data. Try again shortly.'; }
     b.disabled = false; b.textContent = '↻ Refresh'; setTimeout(() => { msg.textContent = ''; }, 9000);
   });
-  let rw = window.innerWidth; window.addEventListener('resize', () => { if (Math.abs(window.innerWidth - rw) > 40) { rw = window.innerWidth; drawDivine(); if (view() === 'tracker') renderTracker(); } });
+  let rw = window.innerWidth; window.addEventListener('resize', () => { if (Math.abs(window.innerWidth - rw) > 40) { rw = window.innerWidth; drawDivine(); if (M) renderTicker(); if (view() === 'tracker') renderTracker(); } });
 
   if (window.matchMedia('(max-width: 900px)').matches) $('#fbox').removeAttribute('open');
   load(true).catch(() => { $('#tbody').replaceChildren(el('tr', {}, el('td', { colspan: 11, class: 'empty', text: 'Could not load market data.' }))); });
