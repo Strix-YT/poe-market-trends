@@ -1221,6 +1221,7 @@ const PAGE_BUILD = '__BUILD__';
     const r = await fetch(IMPORT_API + path + '?' + new URLSearchParams(params));
     let j = null; try { j = await r.json(); } catch (e) {}
     if (!r.ok) throw new Error((j && j.message) || 'Import failed (' + r.status + ').');
+    if (r.headers.get('X-Cache') === 'stale') { const at = +r.headers.get('X-Fetched-At'); B.staleNote = `Path of Exile is busy, so this is the copy saved ${at ? Math.max(1, Math.round((Date.now() - at) / 60000)) + ' min' : 'a while'} ago.`; } else B.staleNote = '';
     return j;
   }
   const RAR = { 0: 'normal', 1: 'magic', 2: 'rare', 3: 'unique', 4: 'gem', 9: 'relic', 10: 'unique' };
@@ -1245,7 +1246,7 @@ const PAGE_BUILD = '__BUILD__';
     const acct = $('#bldAcct').value.trim().replace(/\s+/g, ''), msg = $('#bldMsg');
     if (!/^[^#]{2,40}#\d{4}$/.test(acct)) { msg.textContent = 'Enter the account name with its #1234 tag, e.g. Name#1234.'; return; }
     msg.textContent = 'Looking up ' + acct + '…'; $('#bldChars').replaceChildren(); $('#bldChar').replaceChildren(); B.sel = null;
-    try { B.chars = await api('/characters', { account: acct }); B.acct = acct;
+    try { B.chars = await api('/characters', { account: acct }); B.acct = acct; if (B.staleNote) setTimeout(() => { $('#bldMsg').textContent = B.staleNote; }, 0);
       B.recent = [acct, ...B.recent.filter((a) => a.toLowerCase() !== acct.toLowerCase())]; bsave();
       msg.textContent = ''; renderBuilds();
     } catch (e) { B.chars = null; msg.textContent = e.message; }
@@ -1349,7 +1350,7 @@ const PAGE_BUILD = '__BUILD__';
     const lgUrl = (ch.league || '').toLowerCase().replace(/\s+/g, '');
     const ninja = ch.league === (M && M.league) ? ext(`https://poe.ninja/poe1/builds/${lgUrl}/character/${encodeURIComponent(B.acct.replace('#', '-'))}/${encodeURIComponent(ch.name)}`, 'poe.ninja ↗') : null;
     const prof = ext(`https://www.pathofexile.com/account/view-profile/${encodeURIComponent(B.acct.replace('#', '-'))}/characters?characterName=${encodeURIComponent(ch.name)}`, 'PoE profile ↗');
-    const head = el('div', { class: 'chead' }, el('div', {}, el('h2', { text: ch.name }), el('div', { class: 'cls', text: `Level ${ch.level} ${ch.class} · ${ch.league} · ${B.acct}` })), el('div', { class: 'acts' }, ninja, prof));
+    const head = el('div', { class: 'chead' }, el('div', {}, el('h2', { text: ch.name }), el('div', { class: 'cls', text: `Level ${ch.level} ${ch.class} · ${ch.league} · ${B.acct}` }), B.staleNote ? el('div', { class: 'note', style: 'color:var(--accent)', text: B.staleNote }) : null), el('div', { class: 'acts' }, ninja, prof));
     const treePanel = el('section', { class: 'panel' }, el('h3', { text: 'Passive tree' }), el('div', { class: 'empty', text: 'Loading the passive tree…' }));
     const noItems = !items.length;
     host.replaceChildren(head,
