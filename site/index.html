@@ -1228,13 +1228,15 @@ const PAGE_BUILD = '__BUILD__';
       el('b', { text: c.name }), el('span', { text: `Level ${c.level} ${c.class}` + (c.league !== lg ? ' · ' + c.league : '') }))));
     if (B.data) renderChar($('#bldChar'), B.data);
   }
+  // GGG sends mods either as plain strings or as {description: ...}
+  const modText = (t) => typeof t === 'string' ? t : t && (t.description || t.text || '') || '';
   function itemTip(it) {
     const r = rarity(it), kind = r === 'unique' ? 'u' : r === 'gem' ? 'card' : 'cur';
     const parts = [];
     const props = (it.properties || []).filter((p) => p.values && p.values.length).map((p) => el('div', { class: 'pr' }, p.name.replace(/\{\d\}/g, '') + ': ', el('b', { text: p.values.map((v) => v[0]).join(', ') })));
     if (props.length) parts.push(props);
     if (it.requirements && it.requirements.length) parts.push([el('div', { class: 'pr' }, 'Requires ', ...it.requirements.flatMap((q, k) => [k ? ', ' : '', q.name + ' ', el('b', { text: q.values[0][0] })]))]);
-    [['enchantMods', 'md'], ['implicitMods', 'md'], ['fracturedMods', 'md'], ['explicitMods', 'md'], ['craftedMods', 'md']].forEach(([k, c]) => { if (it[k] && it[k].length) parts.push(it[k].map((t) => el('div', { class: c, style: k === 'craftedMods' ? 'color:#b4b4ff' : k === 'fracturedMods' ? 'color:#a29162' : '', text: t }))); });
+    [['enchantMods', 'md'], ['implicitMods', 'md'], ['fracturedMods', 'md'], ['explicitMods', 'md'], ['craftedMods', 'md']].forEach(([k, c]) => { if (it[k] && it[k].length) parts.push(it[k].map((t) => el('div', { class: c, style: k === 'craftedMods' ? 'color:#b4b4ff' : k === 'fracturedMods' ? 'color:#a29162' : '', text: modText(t) }))); });
     if (it.corrupted) parts.push([el('div', { style: 'color:#d20000', text: 'Corrupted' })]);
     if (it.flavourText && it.flavourText.length) parts.push([el('div', { class: 'fl', text: it.flavourText.join('').replace(/\r/g, '') })]);
     const bd = el('div', { class: 'bd' }); parts.forEach((g, k) => { if (k) bd.append(el('div', { class: 'sep' })); bd.append(...g); });
