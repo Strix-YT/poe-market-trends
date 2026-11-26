@@ -1175,7 +1175,7 @@ const PAGE_BUILD = '__BUILD__';
 
   // ---------------------------------------------------------------- builds: import a public character
   // The import server (worker/index.js, a Cloudflare Worker) reads public profiles the way Path of Building does.
-  const IMPORT_API = '';
+  const IMPORT_API = 'https://poe-market-trends-import.rugvedbauskar.workers.dev';
   const B = { acct: '', chars: null, sel: null, data: null, open: new Set() };
   try { const s0 = JSON.parse(localStorage.getItem('em-builds') || 'null'); if (s0) { B.recent = s0.recent || []; } } catch (e) {} B.recent = B.recent || [];
   const bsave = () => { try { localStorage.setItem('em-builds', JSON.stringify({ recent: B.recent.slice(0, 6) })); } catch (e) {} };
