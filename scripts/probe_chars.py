@@ -10,7 +10,7 @@ st,h,b=call("https://www.pathofexile.com/character-window/get-characters", {"acc
 print("CHARS",st,{k:v for k,v in h.items() if k.lower() in ('content-type','server','cf-mitigated','x-rate-limit-ip','x-rate-limit-ip-state','x-rate-limit-policy','x-rate-limit-rules')}, b[:300])
 try:
     chars=json.loads(b); c=[x for x in chars if x.get("league")=="Covens"] or chars
-    name=c[0]["name"]; print("first char", json.dumps(c[0])[:300])
+    name="RESURRECTTTTT"; print("first char", json.dumps(c[0])[:300])
     st,h,b=call("https://www.pathofexile.com/character-window/get-items", {"accountName":acct,"character":name,"realm":"pc"})
     print("ITEMS-RAW",st,len(b),b[:400])
     st,h,b=call("https://www.pathofexile.com/character-window/get-items?"+urllib.parse.urlencode({"accountName":acct,"character":name,"realm":"pc"}))
