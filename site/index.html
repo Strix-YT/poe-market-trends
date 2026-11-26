@@ -1268,7 +1268,7 @@ const PAGE_BUILD = '__BUILD__';
         el('td', { class: 'nm' }, it.icon ? el('img', { class: 'ico', src: it.icon, alt: '', loading: 'lazy' }) : null,
           el('b', { class: 'r-' + r2, text: it.name || it.typeLine }), it.name ? el('small', { text: it.typeLine }) : null),
         el('td', { class: 'mono', text: L >= 2 ? L + 'L' : '' }),
-        el('td', { class: 'mono', title: mi ? altP(mi.p) + (pr.approx ? ' · several versions trade; cheapest shown' : '') : '' }, mi ? (pr.approx ? '≈ ' : '') + fmtP(mi.p) : el('span', { class: 'dim', text: r2 === 'unique' ? 'not on market' : '—' })),
+        el('td', { class: 'mono', title: mi ? altP(mi.p) + (pr.approx ? ' · several versions trade; cheapest shown' : '') : '' }, mi ? (pr.approx ? '≈ ' : '') + fmtP(mi.p) : el('span', { class: 'dim', title: 'The site only tracks uniques worth 5c or more with at least 10 listed. Use the trade link to check.', text: r2 === 'unique' ? 'cheap or rare · not tracked' : '—' })),
         el('td', {}, mi ? el('span', { class: 'sig ' + sc, text: mi.sig }) : null),
         el('td', {}, trade));
       tr.addEventListener('click', (e) => { if (e.target.closest('a')) return; B.open.has(key) ? B.open.delete(key) : B.open.add(key); renderChar(host, d); });
